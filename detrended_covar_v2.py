@@ -278,7 +278,6 @@ def get_head(d):
 def sum_years(d, start_y=start_year, end_y=end_year, dim=data_dim):
     '''
         Sum all the weeks belonging to the same year
-        regardless of how many weeks are in a given month
     '''
     year_d = {}
     for y in range(start_y, end_y+1):
@@ -288,6 +287,7 @@ def sum_years(d, start_y=start_year, end_y=end_year, dim=data_dim):
         for key, matrix in d.items():
             if key.startswith(year):
                 year_d[year] += matrix
+            year_d[key] = np.vectorize(lambda x: min(x, 4))(matrix) # sets max value as 4 instead of 5
 
     return year_d
 
