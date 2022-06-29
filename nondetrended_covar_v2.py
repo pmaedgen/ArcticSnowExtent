@@ -42,8 +42,6 @@ seasons = {'winter' : [12, 1, 2],
     Only looking at snow for now not sea ice
 
     -> TODO:
-        - ***** Updating imports ruins the maps. Most likely an issue with cartopy
-
         - for seasonal mode:
             - if december load data from previous year
             - for simplicity, just make a seperate load function. Then I can combine later if necessary
@@ -52,14 +50,18 @@ seasons = {'winter' : [12, 1, 2],
         - TEST EVERYTHING
 
         - some of the lmap plots still look slightly off as latitude decreases
-        - Standardize colorbar range
+        - Standardize colorbar/adjust gradient
         - change logs path. Doesn't need to be split up by method, only mode
 
         - simplify/generalize saving tables
+            - save after every calculation instead of once at the end
         - for dfs, update append to concat
 
+        - regression map
+
         - make sure adjustments for variable month lengths are correct.
-            - ticks in plotting function needs to be changed, but that wont get called here so not a priority
+
+        - update SVD (not a priority)
 
         - Clean up and abstract code
             - lots of refactoring, get rid of unneccessary functions and imports
@@ -105,8 +107,10 @@ def seasonal_load_data():
 def monthly_load_data(month, path=data_path, dtype='snow', quiet=False):
     '''
         Loads all data files from the
-        specified path and returns a list where
-        each file is an element
+        specified path, for the given month
+
+        Returns dictionary of files where the key is the start date
+        and the value is the data matrix file (weekly matrix)
 
 
     '''
@@ -115,21 +119,21 @@ def monthly_load_data(month, path=data_path, dtype='snow', quiet=False):
     for dirpath, dirnames, fnames in os.walk(path):
         for fname in [f for f in fnames if f.endswith(".bin")]:
 
-            # Gets annoying real fast when you have a lot of files
-            if not quiet:
-                print("Loading "+fname)
-
-
             fpath = os.path.join(dirpath, fname)
             with open(fpath, 'rb') as f:  # open function read binary file
 
                 # getting the folder names for the key
                 dirnames = dirpath.split('/')
-                key = dirnames[-2] + "-" + dirnames[-1] + "-" + fname[-19:-17]
-
                 # if month is not the one specified, continue
                 if int(dirnames[-1]) != month:
                     continue
+
+                # make key from starting date
+                key = dirnames[-2] + "-" + dirnames[-1] + "-" + fname[-19:-17]
+
+                # Gets annoying real fast when you have a lot of files
+                if not quiet:
+                    print("Loading "+fname)
 
 #                 hdr = f.read(300)  # Reading 300 byte header
                 ice = np.fromfile(f, dtype=np.uint8)  # Unsigned 8 bit Integer (0-2^7)
@@ -287,8 +291,6 @@ def sum_years(d, start_y=start_year, end_y=end_year, dim=data_dim):
         for key, matrix in d.items():
             if key.startswith(year):
                 year_d[year] += matrix
-            year_d[key] = np.vectorize(lambda x: min(x, 4))(matrix) # sets max value as 4 instead of 5
-
     return year_d
 
 
@@ -392,25 +394,31 @@ def monthly_computation_handler(month, lat, lon):
 
     tseries = pd.DataFrame()
 
+    print("Loading/prepping data...")
     ### LOADING/PREPPING DATA
     snow_d = monthly_data_handler(month)
 
     year_snow_d = sum_years(snow_d)
     snow_combined = combine_years(year_snow_d)
+
+    # sets max value as 4 instead of 5
+    # given the format of this matrix, you would want to apply it to all the columns,
+    # but given that the function only works on individual elements for a single month, applying it across all elements row-wise will also work
+    snow_combined = np.vectorize(lambda x: min(x, 4))(snow_combined)
+
     snow_comb = remove_rows(snow_combined, suffix=str(month))
 
     ### SETTING DATA MATRIX, X
     x_time = np.arange(0, snow_comb.shape[1], 1).reshape(-1, 1)
 
     ## NO DETRENDING
-
-
     X = StandardScaler().fit_transform(snow_comb).T
 
 
 
     ########### PCA ############
     ## COVARIANCE CALCULATION
+    print("Starting PCA...")
     snow_fpca = fpca.FastPCA(quiet=True)
     snow_fpca.calculate(X.T) # transpose to put features in rows
     pc = snow_fpca.getPCs()
@@ -419,6 +427,7 @@ def monthly_computation_handler(month, lat, lon):
 
 
     ######## PLOTTING #########
+    print("Plotting...")
     xlocs = np.array([-5, 0, 5, 10, 15, 20, 25, 30, 35, 40, 48])
     xlbls = ['', '1979', '1984', '1989', '1994', '1999', '2004', '2009', '2014', '2019', '']
 
