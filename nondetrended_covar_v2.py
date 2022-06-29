@@ -408,8 +408,13 @@ def monthly_computation_handler(month, lat, lon):
 
     snow_comb = remove_rows(snow_combined, suffix=str(month))
 
-    ### SETTING DATA MATRIX, X
     x_time = np.arange(0, snow_comb.shape[1], 1).reshape(-1, 1)
+    # finding regression coefficients
+    rcoeffs = np.zeros(snow_comb.shape[0])
+    for pixel in range(snow_comb.shape[0]):
+        rcoeffs[pixel] = LinearRegression().fit(x_time, snow_comb[pixel]).coef_
+
+    ### SETTING DATA MATRIX, X
 
     ## NO DETRENDING
     X = StandardScaler().fit_transform(snow_comb).T
@@ -433,6 +438,18 @@ def monthly_computation_handler(month, lat, lon):
 
     time_save_as = figs_path + str(month) + "/snow_time/pc_timeseries"
     lmap_save_as = figs_path + str(month) + "/snow_lmap/map_loading"
+    rmap_save_as = figs_path + str(month) + "/snow_rmap/map_reg_coeff"
+
+
+    ## Plot Regression coefficient map
+    # reinserting and plotting
+    rcoeffs_map = reinsert_rows(rcoeffs, suffix=str(month)).reshape(data_dim[0], data_dim[1])
+    # turn into dict and plot
+    plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
+            save_as=rmap_save_as+".jpg")
+
+
 
     ## PLOT PC TIMESERIES
     for y in range(plt_rng):
@@ -468,7 +485,7 @@ def monthly_computation_handler(month, lat, lon):
 
         # turn into dict and plot
         plotter({"Loadingvector "+str(y):nvec}, coord=(lat, lon), dx=25000, dy=25000,
-            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm'), cb_tix=False,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
             save_as=lmap_save_as+str(y+1)+".jpg")
 
     return tseries, evr

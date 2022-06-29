@@ -442,6 +442,20 @@ def monthly_computation_handler(month, lat, lon):
 
     time_save_as = figs_path + str(month) + "/snow_time/pc_timeseries"
     lmap_save_as = figs_path + str(month) + "/snow_lmap/map_loading"
+    rmap_save_as = figs_path + str(month) + "/snow_rmap/map_reg_coeff"
+
+
+    ## Plot Regression coefficient map
+    # making regression coefficient list
+    rcoeffs = np.zeros(X.shape[1])
+    for pixel in range(X.shape[1]):
+        rcoeffs[pixel] = LinearRegression().fit(x_time, X[:,pixel]).coef_
+    # reinserting and plotting
+    rcoeffs_map = reinsert_rows(rcoeffs, suffix=str(month)).reshape(data_dim[0], data_dim[1])
+    # turn into dict and plot
+    plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
+            save_as=rmap_save_as+".jpg")
 
     ## PLOT PC TIMESERIES
     for y in range(plt_rng):
@@ -478,7 +492,7 @@ def monthly_computation_handler(month, lat, lon):
 
         # turn into dict and plot
         plotter({"Loadingvector "+str(vec):nvec}, coord=(lat, lon), dx=25000, dy=25000,
-            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm'), cb_tix=False,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
                 save_as=lmap_save_as+str(vec+1)+".jpg")
 
 
