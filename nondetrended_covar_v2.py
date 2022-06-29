@@ -501,6 +501,7 @@ if __name__=='__main__':
 
     if mode=='monthly':
         for m in range(1, 13):
+            print()
             print("Month No. " + str(m))
             ts, ev = monthly_computation_handler(m, lat, lon)
             evr[str(m)] = ev
