@@ -405,14 +405,8 @@ def monthly_computation_handler(month, lat, lon):
     # given the format of this matrix, you would want to apply it to all the columns,
     # but given that the function only works on individual elements for a single month, applying it across all elements row-wise will also work
     snow_combined = np.vectorize(lambda x: min(x, 4))(snow_combined)
-
     snow_comb = remove_rows(snow_combined, suffix=str(month))
-
     x_time = np.arange(0, snow_comb.shape[1], 1).reshape(-1, 1)
-    # finding regression coefficients
-    rcoeffs = np.zeros(snow_comb.shape[0])
-    for pixel in range(snow_comb.shape[0]):
-        rcoeffs[pixel] = LinearRegression().fit(x_time, snow_comb[pixel]).coef_
 
     ### SETTING DATA MATRIX, X
 
@@ -449,12 +443,16 @@ def monthly_computation_handler(month, lat, lon):
     rmap_save_as = figs_path + str(month) + "/snow_rmap/map_reg_coeff"
 
 
-    ## Plot Regression coefficient map
+    #### Plot Regression coefficient map - scaling has been applied to raw data
+    # finding regression coefficients
+    rcoeffs = np.zeros(X.shape[1])
+    for pixel in range(X.shape[1]):
+        rcoeffs[pixel] = LinearRegression().fit(x_time, X[:,pixel]).coef_
     # reinserting and plotting
     rcoeffs_map = reinsert_rows(rcoeffs, suffix=str(month)).reshape(data_dim[0], data_dim[1])
     # turn into dict and plot
     plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
-            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
             save_as=rmap_save_as+".jpg")
 
 

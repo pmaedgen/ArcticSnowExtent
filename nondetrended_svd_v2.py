@@ -454,8 +454,11 @@ def monthly_computation_handler(month, lat, lon):
     rcoeffs_map = reinsert_rows(rcoeffs, suffix=str(month)).reshape(data_dim[0], data_dim[1])
     # turn into dict and plot
     plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
-            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
             save_as=rmap_save_as+".jpg")
+
+    print(str(min(rcoeffs))) # just testing
+    print(str(max(rcoeffs)))
 
     ## PLOT PC TIMESERIES
     for y in range(plt_rng):
