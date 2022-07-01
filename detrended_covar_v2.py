@@ -9,6 +9,7 @@ import cartopy.crs as ccrs
 import bitstring as bs
 import multiprocessing
 import fast_pca as fpca
+import sys
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
@@ -498,9 +499,7 @@ def monthly_computation_handler(month, lat, lon):
 
     return tseries, evr
 
-
-if __name__=='__main__':
-
+def main():
     evr = pd.DataFrame() # explained var
     timeseries = {}
 
@@ -521,3 +520,11 @@ if __name__=='__main__':
         for s in seasons.keys():
             print(s)
             seasonal_computation_handler(s, lat, lon)
+
+
+if __name__=='__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Keyboard interrupt detected. Exiting.")
+        sys.exit(0)
