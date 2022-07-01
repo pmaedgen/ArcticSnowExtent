@@ -16,6 +16,8 @@ from sklearn.linear_model import LinearRegression
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'detrended_covar' # options are detrended/nondetrended_covar/svd
 
+save = True
+
 
 ## DO NOT CHANGE UNLESS YOU KNOW WHAT YOURE DOING
 data_path = "./Data/data/"
@@ -246,7 +248,7 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30,
             fig.colorbar(cs, ax=ax, label=lbl)
 
 
-        if save_as:
+        if save_as and save:
             plt.savefig(save_as, format='jpg', dpi=300, bbox_inches = 'tight')
 
         # clear up ram to avoid memory issues when dealing with a lot of figs
@@ -472,7 +474,7 @@ def monthly_computation_handler(month, lat, lon):
 
         tseries["PC_"+str(y+1)] = snow.reshape(-1).tolist() # collection of all standardized pcs
 
-        if time_save_as:
+        if time_save_as and save:
             plt.savefig(time_save_as+str(y+1)+".jpg", format='jpg', dpi=300, bbox_inches = 'tight')
 
         fig.clear()
