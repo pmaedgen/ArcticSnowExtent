@@ -404,10 +404,11 @@ def monthly_computation_handler(month, lat, lon):
     year_snow_d = sum_years(snow_d)
     snow_combined = combine_years(year_snow_d)
 
-    # sets max value as 4 instead of 5
+    # sets max value as 4 instead of 5 then divide by 4
     # given the format of this matrix, you would want to apply it to all the columns,
     # but given that the function only works on individual elements for a single month, applying it across all elements row-wise will also work
-    snow_combined = np.vectorize(lambda x: min(x, 4))(snow_combined)
+    snow_combined = np.vectorize(lambda x: min(x, 4)/4)(snow_combined)
+
     snow_comb = remove_rows(snow_combined, suffix=str(month))
     x_time = np.arange(0, snow_comb.shape[1], 1).reshape(-1, 1)
 
