@@ -408,7 +408,7 @@ def monthly_computation_handler(month, lat, lon):
     # given the format of this matrix, you would want to apply it to all the columns,
     # but given that the function only works on individual elements for a single month, applying it across all elements row-wise will also work
     snow_combined = np.vectorize(lambda x: min(x, 4)/4)(snow_combined)
-    
+
     snow_comb = remove_rows(snow_combined, suffix=str(month))
     x_time = np.arange(0, snow_comb.shape[1], 1).reshape(-1, 1)
 
@@ -416,7 +416,8 @@ def monthly_computation_handler(month, lat, lon):
     ### SETTING DATA MATRIX, X
 
     ## NO DETRENDING
-    X = StandardScaler().fit_transform(snow_comb).T
+    #X = StandardScaler().fit_transform(snow_comb).T
+    X = snow_comb.T
 
 
 

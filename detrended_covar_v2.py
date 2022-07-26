@@ -423,7 +423,8 @@ def monthly_computation_handler(month, lat, lon):
     snow_dt = snow_comb - snow_trend
 
 
-    X = StandardScaler().fit_transform(snow_dt).T
+    # X = StandardScaler().fit_transform(snow_dt).T
+    X = snow_dt.T
 
 
 
