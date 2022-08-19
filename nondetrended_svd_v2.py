@@ -41,6 +41,8 @@ seasons = {'winter' : [12, 1, 2],
 
     Only looking at snow for now not sea ice
 
+    SVD methods currently very out of date (8/15/22)
+
     -> TODO:
         - for seasonal mode:
             - if december load data from previous year

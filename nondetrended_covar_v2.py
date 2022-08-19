@@ -40,29 +40,29 @@ seasons = {'winter' : [12, 1, 2],
 
 '''
     Generalizing to seasonal analysis is still a work in progress
-    But monthly analysis SHOULD work
+    But monthly analysis works
 
     Only looking at snow for now not sea ice
 
     -> TODO:
+
+        - Fourier analysis and extracting continents
+        - Countour plots and mapping significance (fix these)
+
         - for seasonal mode:
             - if december load data from previous year
             - for simplicity, just make a seperate load function. Then I can combine later if necessary
             - will need to adjust the sum years function as well
             - finish seasonal computation
-        - TEST EVERYTHING
 
         - some of the lmap plots still look slightly off as latitude decreases
+            - check cartopy transform
         - Standardize colorbar/adjust gradient
         - change logs path. Doesn't need to be split up by method, only mode
 
         - simplify/generalize saving tables
             - save after every calculation instead of once at the end
         - for dfs, update append to concat
-
-        - regression map
-
-        - make sure adjustments for variable month lengths are correct.
 
         - update SVD (not a priority)
 
@@ -195,7 +195,10 @@ def load_latlon(cpath="./Data/lat_lon/", dim=data_dim):
 
 #### PLOTTING
 
-def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30,
+def f(x, y):
+    return np.sin(x) ** 10 + np.cos(10 + y * x) * np.cos(x)
+
+def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30, contour=False,
             cmap=plt.cm.Blues, cb_tix=True, cb_marg=1, cb_range=None, save_as=None):
     '''
         Plot given list of data matricies
@@ -234,7 +237,7 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30,
         kw = dict(central_latitude=90, central_longitude=0, true_scale_latitude=70)
 
 
-        if(cb_tix):
+        if cb_tix:
             cs = ax.pcolormesh(x, y, ice[1], cmap=cmap,
                        transform=ccrs.Stereographic(**kw), zorder=1)
             fig.colorbar(cs, ax=ax, label=lbl, ticks=[0, 1, 2, 3, 4])
@@ -244,12 +247,24 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30,
                 divnorm=colors.TwoSlopeNorm(vmax=cb_range[1], vcenter=0., vmin=cb_range[0])
             else:
                 divnorm=colors.TwoSlopeNorm(vmax=ice[1].max()+cb_marg, vcenter=0., vmin=ice[1].min()-cb_marg)
-            cs = ax.pcolormesh(x, y, ice[1], cmap=cmap, norm=divnorm,
+
+            if contour:
+                cs = ax.contourf(x, y, ice[1],
+                    transform=ccrs.Stereographic(**kw), cmap=cmap, norm=divnorm)
+                ax.contour(x, y, ice[1], levels=cs.levels,
+                           transform=ccrs.Stereographic(**kw), colors='black')
+
+            else:
+                cs = ax.pcolormesh(x, y, ice[1], cmap=cmap, norm=divnorm,
                        transform=ccrs.Stereographic(**kw), zorder=1)
+
             fig.colorbar(cs, ax=ax, label=lbl)
 
 
-        if save_as and save:
+        if save_as:
+            if contour: # adjusting filename if contour is true
+                save_as = save_as[:-4] + "_contour.jpg"
+
             plt.savefig(save_as, format='jpg', dpi=300, bbox_inches = 'tight')
 
         # clear up ram to avoid memory issues when dealing with a lot of figs
@@ -416,7 +431,7 @@ def monthly_computation_handler(month, lat, lon):
     ### SETTING DATA MATRIX, X
 
     ## NO DETRENDING
-    #X = StandardScaler().fit_transform(snow_comb).T
+    X = StandardScaler().fit_transform(snow_comb).T
     X = snow_comb.T
 
 
@@ -488,7 +503,7 @@ def monthly_computation_handler(month, lat, lon):
 
         # turn into dict and plot
         plotter({"Loadingvector "+str(y):nvec}, coord=(lat, lon), dx=25000, dy=25000,
-            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
+            marg=0, min_lat=30, contour=True, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
             save_as=lmap_save_as+str(y+1)+".jpg")
 
     return tseries, evr
