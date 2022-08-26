@@ -195,6 +195,7 @@ def load_latlon(cpath="./Data/lat_lon/", dim=data_dim):
 
 #### PLOTTING
 
+## delete this
 def f(x, y):
     return np.sin(x) ** 10 + np.cos(10 + y * x) * np.cos(x)
 
