@@ -9,6 +9,7 @@ import credentials
 import googlemaps
 import pandas as pd
 import numpy as np
+import os
 
 ## All countries and their codes w/ associated continent
 continent = { # see https://gist.github.com/nobuti/3816985
@@ -263,15 +264,17 @@ continent = { # see https://gist.github.com/nobuti/3816985
 "ZW":"Africa" # "Republic of Zimbabwe");
 }
 
-data_path = "./Data/data/"
-figs_path = "./figs/"+mode+"_figs/"+method+"/"
-logs_path = "./logs/"+method+"/"+mode+"/"
-tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'detrended_covar' # options are detrended/nondetrended_covar/svd
 dtype = "snow"
 
-def load_latlon(cpath="./Data/lat_lon/", dim=data_dim):
+data_path = "./Data/data/"
+figs_path = "./figs/"+mode+"_figs/"+method+"/"
+logs_path = "./logs/"+method+"/"+mode+"/"
+tabl_path = "./tables/"+mode+"_tables/"+method+"/"
+
+
+def load_latlon(cpath="./Data/lat_lon/", dim=(720, 720)):
     # loading data into dict
     coords = []
     for fname in os.listdir(cpath):
@@ -286,15 +289,47 @@ def load_latlon(cpath="./Data/lat_lon/", dim=data_dim):
     # lon is in [0], lat is in [1]
     return coords[1], coords[0]
 
+def get_country(lats, lons):
+    gmaps = googlemaps.Client(key=credentials.gmaps_key)
+
+    ccode = []
+    for lat, lon in zip(lats, lons):
+        result = gmaps.reverse_geocode((lat, lon))
+        # getting country code
+        ccode.append(list(result[10].values())[0][2].get('short_name')) # make sure this is correct for all of them
+
+    return ccode
+
 def main():
     lat, lon = load_latlon()
 
     ## getting indicies of lat/lon that need to be used
     ## (in order to avoid making 720*720 google maps api calls)
-    suffix = '1' # should be fine to hard code this but I need to test
+
+    suffix = '1' # hardcoded for now but eventually will need to be fixed
     file = logs_path + dtype+"_stds_"+suffix+".txt"
     with open(file) as f:
         lines = [int(line.rstrip()) for line in f]
+
+    # getting just the lattitude and longitudes that I need
+    lats = lat[lines]
+    lons = lon[lines]
+
+    country_codes = get_country(lats, lons)
+
+    # add to pandas
+    df = pd.DataFrame(columns=['lat_lon', 'country_code', 'continent'])
+    for i in range(10): # testing
+    # for i in range(len(lats)):
+        # adding row to end of dataframe (there is definetly a better way to do this)
+        df.loc[len(df.index)] = [(lats[i], lons[i]),
+                                country_codes[i],
+                                continent.get(country_codes[i])]
+
+
+    # saving
+    df.to_csv(logs_path + dtype+"_geo_"+suffix+".csv")
+
 
 
 if __name__=="__main__":
