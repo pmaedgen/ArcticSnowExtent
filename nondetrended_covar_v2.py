@@ -25,7 +25,7 @@ data_path = "./Data/data/"
 figs_path = "./figs/"+mode+"_figs/"+method+"/"
 logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
-fig_ext = "png"
+fig_ext = "jpg"
 
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over

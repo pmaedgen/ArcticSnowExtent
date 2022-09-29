@@ -25,6 +25,7 @@ data_path = "./Data/data/"
 figs_path = "./figs/"+mode+"_figs/"+method+"/"
 logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
+fig_ext = "jpg"
 
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
@@ -263,10 +264,10 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30, co
 
 
         if save_as:
-            if contour: # adjusting filename if contour is true (fix this to work woth other file extensions)
-                save_as = save_as[:-4] + "_contour.jpg"
+            if contour: # adjusting filename if contour is true
+                save_as = save_as[:-4] + "_contour." + fig_ext
 
-            plt.savefig(save_as, format='jpg', dpi=300, bbox_inches = 'tight')
+            plt.savefig(save_as, format=fig_ext, dpi=300, bbox_inches = 'tight')
 
         # clear up ram to avoid memory issues when dealing with a lot of figs
         fig.clear()
@@ -439,8 +440,8 @@ def monthly_computation_handler(month, lat, lon):
     snow_dt = snow_comb - snow_trend
 
 
-    X = StandardScaler().fit_transform(snow_dt).T
-    X = snow_dt.T
+    X = StandardScaler().fit_transform(snow_dt.T).T
+    # X = snow_dt.T
 
 
 
@@ -448,7 +449,7 @@ def monthly_computation_handler(month, lat, lon):
     ## COVARIANCE CALCULATION
     print("Starting PCA...")
     snow_fpca = fpca.FastPCA(quiet=True)
-    snow_fpca.calculate(X.T) # transpose to put features in rows
+    snow_fpca.calculate(X) # transpose to put features in rows
     pc = snow_fpca.getPCs()
     eof = snow_fpca.getEOFs()
     evr = snow_fpca.getExpVar()
@@ -466,15 +467,15 @@ def monthly_computation_handler(month, lat, lon):
 
     #### Plot Regression coefficient map - scaling has been applied to raw data
     # finding regression coefficients
-    rcoeffs = np.zeros(X.shape[1])
-    for pixel in range(X.shape[1]):
-        rcoeffs[pixel] = LinearRegression().fit(x_time, X[:,pixel]).coef_
+    rcoeffs = np.zeros(X.shape[0])
+    for pixel in range(X.shape[0]):
+        rcoeffs[pixel] = LinearRegression().fit(x_time, X[pixel,:]).coef_
     # reinserting and plotting
     rcoeffs_map = reinsert_rows(rcoeffs, suffix=str(month)).reshape(data_dim[0], data_dim[1])
     # turn into dict and plot
     plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
-            save_as=rmap_save_as+".jpg")
+            save_as=rmap_save_as+"."+fig_ext)
 
 
 
@@ -494,7 +495,7 @@ def monthly_computation_handler(month, lat, lon):
         tseries["PC_"+str(y+1)] = snow.reshape(-1).tolist() # collection of all standardized pcs
 
         if time_save_as and save:
-            plt.savefig(time_save_as+str(y+1)+".jpg", format='jpg', dpi=300, bbox_inches = 'tight')
+            plt.savefig(time_save_as+str(y+1)+"."+fig_ext, format=fig_ext, dpi=300, bbox_inches = 'tight')
 
         fig.clear()
         plt.close(fig)
@@ -513,7 +514,7 @@ def monthly_computation_handler(month, lat, lon):
         # turn into dict and plot
         plotter({"Loadingvector "+str(y):nvec}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, contour=True, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
-            save_as=lmap_save_as+str(y+1)+".jpg")
+            save_as=lmap_save_as+str(y+1)+"."+fig_ext)
 
     return tseries, evr
 
