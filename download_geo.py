@@ -3,6 +3,9 @@
     using google maps API
 
     This script only needs to be run when the output file isn't already saved
+
+
+    NOT NEEDED - FILE CAN BE DELETED
 '''
 
 import credentials
@@ -296,7 +299,9 @@ def get_country(lats, lons):
     for lat, lon in zip(lats, lons):
         result = gmaps.reverse_geocode((lat, lon))
         # getting country code
-        ccode.append(list(result[10].values())[0][2].get('short_name')) # make sure this is correct for all of them
+        for res in result[0]['address_components']:
+            if "country" in res['types']:
+                ccode.append(res['short_name'])
 
     return ccode
 
@@ -312,12 +317,16 @@ def main():
         lines = [int(line.rstrip()) for line in f]
 
     # getting just the lattitude and longitudes that I need
+    lat = lat.flatten()
+    lon = lon.flatten()
     lats = lat[lines]
     lons = lon[lines]
 
-    country_codes = get_country(lats, lons)
+    print("Getting countries...")
+    country_codes = get_country(lats[:10], lons[:10])
 
     # add to pandas
+    print("Creating DataFrame...")
     df = pd.DataFrame(columns=['lat_lon', 'country_code', 'continent'])
     for i in range(10): # testing
     # for i in range(len(lats)):
@@ -328,6 +337,7 @@ def main():
 
 
     # saving
+    print("Saving DataFrame...")
     df.to_csv(logs_path + dtype+"_geo_"+suffix+".csv")
 
 
