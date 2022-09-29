@@ -207,7 +207,7 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30, co
         TODO: rewrite to be more versatile, plot only single instance
         or different time periods
     '''
-    plt.rcParams["font.family"] = "Times New Roman"
+    # plt.rcParams["font.family"] = "Times New Roman"
 
 
     lons = sorted(set(coord[1].flatten()))
@@ -510,7 +510,7 @@ def monthly_computation_handler(month, lat, lon):
 
         # turn into dict and plot
         plotter({"Loadingvector "+str(y):nvec}, coord=(lat, lon), dx=25000, dy=25000,
-            marg=0, min_lat=30, contour=True, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
+            marg=0, min_lat=30, contour=False, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
             save_as=lmap_save_as+str(y+1)+"."+fig_ext)
 
     return tseries, evr
