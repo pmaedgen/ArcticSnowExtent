@@ -533,6 +533,7 @@ def main():
             evr[str(m)] = ev
             timeseries[m] = ts
 
+        print("\nWriting results to spreadsheet.")
         write_evr(evr, save_as="explained_var_ratio.xlsx")
         write_timeseries(timeseries, "pc_timeseries.xlsx")
     elif mode=="seasonal":
