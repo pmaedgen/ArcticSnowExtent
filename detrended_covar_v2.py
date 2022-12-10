@@ -14,6 +14,8 @@ import sys
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
 
+plt.rcParams.update({'font.size': 22})
+
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'detrended_covar' # options are detrended/nondetrended_covar/svd
 

@@ -14,6 +14,8 @@ import sys
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
 
+plt.rcParams.update({'font.size': 22})
+
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'nondetrended_covar' # options are detrended/nondetrended_covar/svd
 
@@ -206,6 +208,8 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30, co
 
         TODO: rewrite to be more versatile, plot only single instance
         or different time periods
+
+        Figure out how to standardize colors/colorbar
     '''
     # plt.rcParams["font.family"] = "Times New Roman"
 
@@ -260,6 +264,7 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30, co
                        transform=ccrs.Stereographic(**kw), zorder=1)
 
             fig.colorbar(cs, ax=ax, label=lbl)
+
 
 
         if save_as:
