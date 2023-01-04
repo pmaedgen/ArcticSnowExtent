@@ -19,7 +19,9 @@ plt.rcParams.update({'font.size': 22})
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'nondetrended_covar' # options are detrended/nondetrended_covar/svd
 
-save = True
+save = False
+display = True # display the plots on the screen
+# The order they are displayed in are regression map -> timeseries 1, 2, 3 -> loading map 1, 2, 3
 
 
 ## DO NOT CHANGE UNLESS YOU KNOW WHAT YOURE DOING
@@ -29,6 +31,7 @@ logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 fig_ext = "jpg"
 
+m_rng = range(1, 2) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
 data_dim = (720, 720) # shape of all of the data files
@@ -40,6 +43,12 @@ seasons = {'winter' : [12, 1, 2],
            'spring' : [3, 4, 5],
            'summer' : [6, 7, 8],
            'fall'   : [9, 10, 11]}
+
+# Dictionary for a months number and its abbreviated name (I could just import datetime to do this, but this works too)
+m_names = {1 : 'Jan', 2 : 'Feb', 3 : 'Mar', 4 : 'Apr',
+           5 : 'May', 6 : 'Jun', 7 : 'Jul', 8 : 'Aug',
+           9 : 'Sep', 10 : 'Oct', 11 : 'Nov', 12 : 'Dec'}
+
 
 '''
     Generalizing to seasonal analysis is still a work in progress
@@ -201,8 +210,9 @@ def load_latlon(cpath="./Data/lat_lon/", dim=data_dim):
 def f(x, y):
     return np.sin(x) ** 10 + np.cos(10 + y * x) * np.cos(x)
 
-def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30, contour=False,
-            cmap=plt.cm.Blues, cb_tix=True, cb_marg=1, cb_range=None, save_as=None):
+def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=False,
+            cmap=plt.cm.Blues, cb_tix=True, cb_marg=1, cb_range=None, month=None, cbar_label=None,
+            save_as=None):
     '''
         Plot given list of data matricies
 
@@ -245,7 +255,7 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30, co
         if cb_tix:
             cs = ax.pcolormesh(x, y, ice[1], cmap=cmap,
                        transform=ccrs.Stereographic(**kw), zorder=1)
-            fig.colorbar(cs, ax=ax, label=lbl, ticks=[0, 1, 2, 3, 4])
+            cb = fig.colorbar(cs, ax=ax, ticks=[0, 1, 2, 3, 4])
         else: # should be the case where I need a diverging color bar
 
             if cb_range:
@@ -263,15 +273,22 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, lbl='', min_lat=30, co
                 cs = ax.pcolormesh(x, y, ice[1], cmap=cmap, norm=divnorm,
                        transform=ccrs.Stereographic(**kw), zorder=1)
 
-            fig.colorbar(cs, ax=ax, label=lbl)
+            cb = fig.colorbar(cs, ax=ax)
 
 
+        if month:
+            ax.set_title(m_names.get(month), fontsize=28)
+        if cbar_label:
+            cb.set_label(cbar_label, rotation=270, labelpad=30, fontsize=24)
 
         if save_as:
             if contour: # adjusting filename if contour is true
                 save_as = save_as[:-4] + "_contour." + fig_ext
 
             plt.savefig(save_as, format=fig_ext, dpi=300, bbox_inches = 'tight')
+
+        if display:
+            plt.show()
 
         # clear up ram to avoid memory issues when dealing with a lot of figs
         fig.clear()
@@ -478,7 +495,7 @@ def monthly_computation_handler(month, lat, lon):
     # turn into dict and plot
     plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
-            save_as=rmap_save_as+"."+fig_ext)
+            month=month, cbar_label="No. weeks / year", save_as=rmap_save_as+"."+fig_ext)
 
 
     ## PLOT PC TIMESERIES
@@ -499,6 +516,9 @@ def monthly_computation_handler(month, lat, lon):
         if time_save_as and save:
             plt.savefig(time_save_as+str(y+1)+"."+fig_ext, format=fig_ext, dpi=300, bbox_inches = 'tight')
 
+        if display:
+            plt.show()
+
         fig.clear()
         plt.close(fig)
 
@@ -516,7 +536,7 @@ def monthly_computation_handler(month, lat, lon):
         # turn into dict and plot
         plotter({"Loadingvector "+str(y):nvec}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, contour=False, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
-            save_as=lmap_save_as+str(y+1)+"."+fig_ext)
+            month=month, save_as=lmap_save_as+str(y+1)+"."+fig_ext)
 
     return tseries, evr
 
@@ -529,7 +549,7 @@ def main():
     lat, lon = load_latlon()
 
     if mode=='monthly':
-        for m in range(1, 13):
+        for m in m_rng:
             print()
             print("Month No. " + str(m))
             ts, ev = monthly_computation_handler(m, lat, lon)
