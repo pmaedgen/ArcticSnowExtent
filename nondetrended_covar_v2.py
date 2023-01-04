@@ -19,8 +19,8 @@ plt.rcParams.update({'font.size': 22})
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'nondetrended_covar' # options are detrended/nondetrended_covar/svd
 
-save = False
-display = True # display the plots on the screen
+save = True
+display = False # display the plots on the screen
 # The order they are displayed in are regression map -> timeseries 1, 2, 3 -> loading map 1, 2, 3
 
 
@@ -31,7 +31,7 @@ logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 fig_ext = "jpg"
 
-m_rng = range(1, 2) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
+m_rng = range(1, 3) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
 data_dim = (720, 720) # shape of all of the data files
@@ -277,7 +277,7 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=Fa
 
 
         if month:
-            ax.set_title(m_names.get(month), fontsize=28)
+            ax.set_title(m_names.get(month), fontsize=28, pad=15)
         if cbar_label:
             cb.set_label(cbar_label, rotation=270, labelpad=30, fontsize=24)
 

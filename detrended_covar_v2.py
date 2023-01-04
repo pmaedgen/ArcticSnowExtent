@@ -19,8 +19,8 @@ plt.rcParams.update({'font.size': 22})
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'detrended_covar' # options are detrended/nondetrended_covar/svd
 
-save = False
-display = True # display the plots on the screen
+save = True
+display = False # display the plots on the screen
 # The order they are displayed in are regression map -> timeseries 1, 2, 3 -> loading map 1, 2, 3
 
 
@@ -277,7 +277,7 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=Fa
             cb = fig.colorbar(cs, ax=ax)
 
         if month:
-            ax.set_title(m_names.get(month), fontsize=28)
+            ax.set_title(m_names.get(month), fontsize=28, pad=15)
         if cbar_label:
             cb.set_label(cbar_label, rotation=270, labelpad=30, fontsize=24)
 
