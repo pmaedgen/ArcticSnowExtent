@@ -441,10 +441,9 @@ def monthly_computation_handler(month, lat, lon):
     # print(snow_comb.shape)
 
     X = StandardScaler().fit_transform(snow_comb.T).T
-    #X = snow_comb.T
-    #
-    # print(X[:10])
+
     # print(X.shape)
+    # print(snow_comb.shape)
 
 
 
@@ -468,11 +467,12 @@ def monthly_computation_handler(month, lat, lon):
     rmap_save_as = figs_path + str(month) + "/snow_rmap/map_reg_coeff"
 
 
-    #### Plot Regression coefficient map - scaling has been applied to raw data
+
+    #### Plot Regression coefficient map
     # finding regression coefficients
     rcoeffs = np.zeros(X.shape[0])
     for pixel in range(X.shape[0]):
-        rcoeffs[pixel] = LinearRegression().fit(x_time, X[pixel,:]).coef_
+        rcoeffs[pixel] = LinearRegression().fit(x_time, snow_comb[pixel,:]).coef_
     # reinserting and plotting
     rcoeffs_map = reinsert_rows(rcoeffs, suffix=str(month)).reshape(data_dim[0], data_dim[1])
     # turn into dict and plot
