@@ -427,6 +427,8 @@ def write_timeseries(ts, save_as):
             t.to_excel(writer, sheet_name = str(m), index=False)
 
 
+
+
 #################################################
 
 def seasonal_data_handler(season):
@@ -512,6 +514,7 @@ def monthly_computation_handler(month, lat, lon):
     plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
             month=month, cbar_label="No. weeks / year", save_as=rmap_save_as+"."+fig_ext)
+
 
     # Plot heatmaps over specified boundary for a given month
     while(len(hmaps)>0 and month==hmaps[0][0]): # check if current month has boundary box
