@@ -32,11 +32,22 @@ tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 fig_ext = "jpg"
 
 m_rng = range(1, 13) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
+
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
 data_dim = (720, 720) # shape of all of the data files
 start_year = 1979
 end_year = 2020
+
+# Heatmap boundaries
+# sorted list of tuples of tuples(month, (min. longitude (degrees EAST), max. longitude,
+# min. latitude (degrees NORTH), max. latitude))
+hmaps = [(1, (80, 90, 40, 45)),
+        (4, (65, 80, 50, 55)),
+        (10, (90, 120, 60, 67))] # note for later - may try to define a coordinate Class
+# remove months that aren't in m_rng (there are better ways to do this once I get around to refactoring)
+hmaps = [tup for tup in hmaps if tup[0] in m_rng]
+hmaps.sort(key=lambda tup: tup[0]) # sorted ascending by months
 
 # Dictionary of how months are organized into seasons
 seasons = {'winter' : [12, 1, 2],
@@ -211,8 +222,8 @@ def f(x, y):
     return np.sin(x) ** 10 + np.cos(10 + y * x) * np.cos(x)
 
 def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=False,
-            cmap=plt.cm.Blues, cb_tix=True, cb_marg=1, cb_range=None, month=None, cbar_label=None,
-            save_as=None):
+            cmap=plt.cm.Blues, cb_tix=True, cb_marg=1, cb_range=None,
+            bbox=None, month=None, cbar_label=None, save_as=None):
     '''
         Plot given list of data matricies
 
@@ -275,6 +286,11 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=Fa
 
             cb = fig.colorbar(cs, ax=ax)
 
+        if bbox:
+            ax.plot([bbox[0], bbox[1], bbox[1], bbox[0], bbox[0]],
+                    [bbox[3], bbox[3], bbox[2], bbox[2], bbox[3]],
+                    c='black', zorder=10,
+                    transform=ccrs.PlateCarree())
 
         if month:
             ax.set_title(m_names.get(month), fontsize=28, pad=15)
@@ -496,6 +512,24 @@ def monthly_computation_handler(month, lat, lon):
     plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
             month=month, cbar_label="No. weeks / year", save_as=rmap_save_as+"."+fig_ext)
+
+    # Plot heatmaps over specified boundary for a given month
+    while(len(hmaps)>0 and month==hmaps[0][0]): # check if current month has boundary box
+        bbox = hmaps.pop(0)[1] # tuple of coordinates
+
+        # file names
+        rmap_box_save_as = figs_path + str(month) + "/snow_rmap/map_rcoeff_bbox_" + str(bbox[0]) + "_" + str(bbox[1]) + "_"+ str(bbox[2]) + "_" + str(bbox[3])
+        hmap_save_as = figs_path + str(month) + "/snow_rmap/hmap_" + str(bbox[0]) + "_" + str(bbox[1]) + "_"+ str(bbox[2]) + "_" + str(bbox[3])
+
+
+        # replot regression coefficient map with bounding box
+        plotter({"Regression coefficient map with bbox" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005, bbox=bbox,
+            month=month, cbar_label="No. weeks / year", save_as=rmap_box_save_as+"."+fig_ext)
+
+        # get specified coordinate grid
+
+        # plot/save "heatmap"
 
 
     ## PLOT PC TIMESERIES
