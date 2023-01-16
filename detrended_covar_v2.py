@@ -549,14 +549,19 @@ def monthly_computation_handler(month, lat, lon):
         hmap_data = get_box_data(snow_combined, lat.flatten(), lon.flatten(), bbox)
 
         # plot/save "heatmap"
+        fig = plt.figure(figsize=(8, 8))
         plt.imshow(hmap_data, interpolation='nearest', cmap=plt.cm.get_cmap('coolwarm_r'), aspect='auto')
-        plt.xlabel("years", fontsize=24)
-        plt.ylabel("pixels", fontsize=24)
+        plt.xticks(xlocs[1::2], xlbls[1::2])
+        plt.xlabel("years", fontsize=22)
+        plt.ylabel("pixels", fontsize=22)
 
         if save:
             plt.savefig(hmap_save_as+"."+fig_ext, format=fig_ext, dpi=300, bbox_inches="tight")
         if display:
             plt.show()
+
+        fig.clear()
+        plt.close(fig)
 
 
 
