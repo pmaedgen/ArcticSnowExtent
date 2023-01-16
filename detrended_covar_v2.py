@@ -19,7 +19,7 @@ plt.rcParams.update({'font.size': 22})
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'detrended_covar' # options are detrended/nondetrended_covar/svd
 
-save = True
+save = False
 display = False # display the plots on the screen
 # The order they are displayed in are regression map -> timeseries 1, 2, 3 -> loading map 1, 2, 3
 
@@ -31,7 +31,7 @@ logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 fig_ext = "jpg"
 
-m_rng = range(1, 13) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
+m_rng = range(1, 2) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
 data_dim = (720, 720) # shape of all of the data files
@@ -395,7 +395,7 @@ def cut_rows(m, fname):
     indicies = [int(line.strip()) for line in open(fname, 'r')]
 
     # get np matrix of indicies
-    return m[np.ix_(indicies)]
+    return m[np.ix_(indicies)], indicies # np.ix_ should be working correctly here but it may not be necessary as the indicies are 1 dimensional
 
 
 def reinsert_rows(vec, suffix='', dtype="snow", dim=data_dim):
@@ -464,7 +464,7 @@ def monthly_computation_handler(month, lat, lon):
     # but given that the function only works on individual elements for a single month, applying it across all elements row-wise will also work
     snow_combined = np.vectorize(lambda x: min(x, 4)/4)(snow_combined)
 
-    snow_comb = remove_rows(snow_combined, suffix=str(month))
+    snow_comb, indicies = remove_rows(snow_combined, suffix=str(month))
     x_time = np.arange(0, snow_comb.shape[1], 1).reshape(-1, 1)
 
     ### SETTING DATA MATRIX, X
@@ -507,6 +507,9 @@ def monthly_computation_handler(month, lat, lon):
         rcoeffs[pixel] = LinearRegression().fit(x_time, snow_dt[pixel,:]).coef_
     # reinserting and plotting
     rcoeffs_map = reinsert_rows(rcoeffs, suffix=str(month)).reshape(data_dim[0], data_dim[1])
+
+
+
     # turn into dict and plot
     plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
@@ -548,7 +551,7 @@ def monthly_computation_handler(month, lat, lon):
 
         tseries["PC_"+str(y+1)] = snow.reshape(-1).tolist() # collection of all standardized pcs
 
-        if time_save_as and save:
+        if save:
             plt.savefig(time_save_as+str(y+1)+"."+fig_ext, format=fig_ext, dpi=300, bbox_inches = 'tight')
 
         if display:
@@ -590,9 +593,10 @@ def main():
             evr[str(m)] = ev
             timeseries[m] = ts
 
-        print("\nWriting results to spreadsheet.")
-        write_evr(evr, save_as="explained_var_ratio.xlsx")
-        write_timeseries(timeseries, "pc_timeseries.xlsx")
+        if save:
+            print("\nWriting results to spreadsheet.")
+            write_evr(evr, save_as="explained_var_ratio.xlsx")
+            write_timeseries(timeseries, "pc_timeseries.xlsx")
     elif mode=="seasonal":
         for s in seasons.keys():
             print(s)
