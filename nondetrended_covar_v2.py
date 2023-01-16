@@ -19,10 +19,8 @@ plt.rcParams.update({'font.size': 22})
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'nondetrended_covar' # options are detrended/nondetrended_covar/svd
 
-save = False
+save = True
 display = False # display the plots on the screen
-# The order they are displayed in are regression map -> timeseries 1, 2, 3 -> loading map 1, 2, 3
-
 
 ## DO NOT CHANGE UNLESS YOU KNOW WHAT YOURE DOING
 data_path = "./Data/data/"
@@ -31,7 +29,7 @@ logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 fig_ext = "jpg"
 
-m_rng = range(1, 2) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
+m_rng = range(1, 13) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
 
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
@@ -545,8 +543,9 @@ def monthly_computation_handler(month, lat, lon):
         hmap_data = get_box_data(snow_combined, lat.flatten(), lon.flatten(), bbox)
 
         # plot/save "heatmap"
-        plt.imshow(hmap_data, interpolation='nearest',
-            extent=[0, hmap_data.shape[0], 0, hmap_data.shape[1]], aspect=(hmap_data.shape[0]//hmap_data.shape[1]))
+        plt.imshow(hmap_data, interpolation='nearest', cmap=plt.cm.get_cmap('coolwarm_r'), aspect='auto')
+        plt.xlabel("years", fontsize=24)
+        plt.ylabel("pixels", fontsize=24)
 
         if save:
             plt.savefig(hmap_save_as+"."+fig_ext, format=fig_ext, dpi=300, bbox_inches="tight")

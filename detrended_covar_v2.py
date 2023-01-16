@@ -19,9 +19,8 @@ plt.rcParams.update({'font.size': 22})
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'detrended_covar' # options are detrended/nondetrended_covar/svd
 
-save = False
+save = True
 display = False # display the plots on the screen
-# The order they are displayed in are regression map -> timeseries 1, 2, 3 -> loading map 1, 2, 3
 
 
 ## DO NOT CHANGE UNLESS YOU KNOW WHAT YOURE DOING
@@ -31,7 +30,7 @@ logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 fig_ext = "jpg"
 
-m_rng = range(1, 2) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
+m_rng = range(1, 13) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
 data_dim = (720, 720) # shape of all of the data files
@@ -428,6 +427,22 @@ def write_timeseries(ts, save_as):
             t.to_excel(writer, sheet_name = str(m), index=False)
 
 
+def get_box_data(data, lat, lon, box):
+    '''
+    Return a subset of the data as defined by a box of coordinates.
+    The data variable must be the non abbreviated, aggregated dataset (i.e. its shape is 720^2 rows and  42 columns)
+    The lat/lon variables are still in their flattend form
+    And the box variable is a tuple that goes (lon min, lon max, lat min, lat max)
+    '''
+
+    # Get the indicies of longitude and latitude that are within the range
+    lon_idx = np.where( (lon >= box[0]) & (lon <= box[1]) )
+    lat_idx = np.where( (lat >= box[2]) & (lat <= box[3]) )
+
+    # The indicies of pixels within the box are in the intersection of lon and lat indicies within the range
+    return data[np.intersect1d(lon_idx, lat_idx, assume_unique=True), :]
+
+
 #################################################
 
 def seasonal_data_handler(season):
@@ -530,9 +545,18 @@ def monthly_computation_handler(month, lat, lon):
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005, bbox=bbox,
             month=month, cbar_label="No. weeks / year", save_as=rmap_box_save_as+"."+fig_ext)
 
-        # get specified coordinate grid
+        # get specified pixes based on coordinates
+        hmap_data = get_box_data(snow_combined, lat.flatten(), lon.flatten(), bbox)
 
         # plot/save "heatmap"
+        plt.imshow(hmap_data, interpolation='nearest', cmap=plt.cm.get_cmap('coolwarm_r'), aspect='auto')
+        plt.xlabel("years", fontsize=24)
+        plt.ylabel("pixels", fontsize=24)
+
+        if save:
+            plt.savefig(hmap_save_as+"."+fig_ext, format=fig_ext, dpi=300, bbox_inches="tight")
+        if display:
+            plt.show()
 
 
 
