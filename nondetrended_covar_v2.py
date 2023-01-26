@@ -456,20 +456,30 @@ def get_regression_coeffs(data, domain, N, two_tailed=True):
         # slopes
         rcoeffs[pixel] = lreg.coef_
 
-        ### t-test
-        # residuals
+        # ### t-test
+        # # residuals
+        # ypred = lreg.predict(domain)
+        # resid = data[pixel,:] - ypred
+        # # variance of residuals
+        # resid_var = np.square(resid).sum() / dof
+        # # standard error of rcoeff
+        # s_a = resid_var / np.square( data[pixel,:] - data[pixel,:].mean() ).sum()
+        # # t
+        # t = rcoeffs[pixel] / np.sqrt(s_a)
+
+
+        # ypred = lreg.predict(domain)
+        # resid = data[pixel,:] - ypred
+        # t = (rcoeffs[pixel] * np.sqrt(dof * np.square( data[pixel,:] - data[pixel,:].mean() ).sum())) / np.sqrt( np.square(resid).sum() )
+
         ypred = lreg.predict(domain)
         resid = data[pixel,:] - ypred
+        sterr = np.square(resid).sum() / ( dof * np.square(data[pixel,:] - data[pixel,:].mean()).sum() )
+        t = rcoeffs[pixel] / np.sqrt(sterr)
 
-        # variance of residuals
-        resid_var = np.square(resid).sum() / dof
 
-        # standard error of rcoeff
-        s_a = resid_var / np.square( data[pixel,:] - data[pixel,:].mean() ).sum()
 
-        # t
-        t = np.abs(rcoeffs[pixel]) / np.sqrt(s_a)
-        # print(t)
+        print(t)
         if t > tval:
             significant.append(pixel)
 
@@ -560,14 +570,9 @@ def monthly_computation_handler(month, lat, lon):
     lmap_save_as = figs_path + str(month) + "/snow_lmap/map_loading"
     rmap_save_as = figs_path + str(month) + "/snow_rmap/map_reg_coeff"
 
-    # finding regression coefficients
-    rcoeffs = np.zeros(X.shape[0])
-    for pixel in range(X.shape[0]):
-        rcoeffs[pixel] = LinearRegression().fit(x_time, snow_comb[pixel,:]).coef_
-
     #### Plot Regression coefficient map
 
-    rcoeffs, significant = get_regression_coeffs(snow_comb, x_time, X.shape[0]) # add return value here, also need to track indicies when rows are inserted
+    rcoeffs, significant = get_regression_coeffs(snow_comb, x_time, X.shape[0]) # need to track indicies when rows are inserted
     print(significant)
 
     # reinserting and plotting

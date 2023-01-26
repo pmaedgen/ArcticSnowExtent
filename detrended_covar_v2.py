@@ -443,6 +443,47 @@ def get_box_data(data, lat, lon, box):
     return data[np.intersect1d(lon_idx, lat_idx, assume_unique=True), :]
 
 
+def get_regression_coeffs(data, domain, N, two_tailed=True):
+
+    # threshold based on 95% confidence interval and 40 degrees of freedom
+    dof = data.shape[1] - 2 # 40
+    tval = 2.021
+    if not two_tailed:
+        tval = 1.684
+
+    # finding regression coefficients
+    rcoeffs = np.zeros(N)
+    significant = [] # contains indicies of statistically significant pixels
+    for pixel in range(N):
+        lreg = LinearRegression().fit(domain, data[pixel,:])
+        # slopes
+        rcoeffs[pixel] = lreg.coef_
+
+        ### t-test
+        # residuals
+        ypred = lreg.predict(domain)
+        resid = data[pixel,:] - ypred
+
+        # variance of residuals
+        resid_var = np.square(resid).sum() / dof
+
+        # standard error of rcoeff
+        s_a = resid_var / np.square( data[pixel,:] - data[pixel,:].mean() ).sum()
+
+        # t
+        t = rcoeffs[pixel] / np.sqrt(s_a)
+        print(t)
+        if t > tval:
+            significant.append(pixel)
+
+
+
+
+
+
+    return rcoeffs, significant
+
+
 #################################################
 
 def seasonal_data_handler(season):
@@ -516,14 +557,12 @@ def monthly_computation_handler(month, lat, lon):
 
     #### REGRESSION MAP WILL BE BLANK FOR DETRENDED
     #### Plot Regression coefficient map
-    # finding regression coefficients
-    rcoeffs = np.zeros(X.shape[0])
-    for pixel in range(X.shape[0]):
-        rcoeffs[pixel] = LinearRegression().fit(x_time, snow_dt[pixel,:]).coef_
+
+    rcoeffs, significant = get_regression_coeffs(snow_dt, x_time, X.shape[0]) # need to track indicies when rows are inserted
+    print(significant)
+
     # reinserting and plotting
     rcoeffs_map = reinsert_rows(rcoeffs, suffix=str(month)).reshape(data_dim[0], data_dim[1])
-
-
 
     # turn into dict and plot
     plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
