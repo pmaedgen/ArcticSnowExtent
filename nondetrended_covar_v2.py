@@ -20,7 +20,7 @@ mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'nondetrended_covar' # options are detrended/nondetrended_covar/svd
 
 save = False
-display = False # display the plots on the screen
+display = True # display the plots on the screen
 
 ## DO NOT CHANGE UNLESS YOU KNOW WHAT YOURE DOING
 data_path = "./Data/data/"
@@ -29,7 +29,7 @@ logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 fig_ext = "jpg"
 
-m_rng = range(1, 13) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
+m_rng = range(10, 13) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
 
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
@@ -400,7 +400,7 @@ def reinsert_rows(vec, suffix='', dtype="snow", dim=data_dim):
         Read the list of indicies then insert zeros,
         then return vector
 
-        fix this: may need to reinsert rows from vec 1 by 1
+        optionally return the indicies that were changed as well
     '''
 
     # list on indicies not removed from original vector
@@ -413,7 +413,7 @@ def reinsert_rows(vec, suffix='', dtype="snow", dim=data_dim):
     # replacing with values from vec
     z[lines] = vec
 
-    return z
+    return z, lines
 
 def write_evr(evr, save_as):
     with pd.ExcelWriter(tabl_path+save_as) as writer:
@@ -442,6 +442,9 @@ def get_box_data(data, lat, lon, box):
 
 def get_regression_coeffs(data, domain, N, two_tailed=True):
 
+    maxt = 0
+    mint = 0
+
     # threshold based on 95% confidence interval and 40 degrees of freedom
     dof = data.shape[1] - 2 # 40
     tval = 2.021
@@ -450,7 +453,7 @@ def get_regression_coeffs(data, domain, N, two_tailed=True):
 
     # finding regression coefficients
     rcoeffs = np.zeros(N)
-    significant = [] # contains indicies of statistically significant pixels
+    significant = np.full(N, False, dtype=bool) # contains indicies of statistically significant pixels
     for pixel in range(N):
         lreg = LinearRegression().fit(domain, data[pixel,:])
         # slopes
@@ -475,16 +478,24 @@ def get_regression_coeffs(data, domain, N, two_tailed=True):
         ypred = lreg.predict(domain)
         resid = data[pixel,:] - ypred
         sterr = np.square(resid).sum() / ( dof * np.square(data[pixel,:] - data[pixel,:].mean()).sum() )
-        t = rcoeffs[pixel] / np.sqrt(sterr)
+        #t = rcoeffs[pixel] / np.sqrt(sterr)
+        t = rcoeffs[pixel] / sterr
+        #print(sterr)
+
+        if t > maxt:
+            maxt = t
+        if t < mint:
+            mint = t
 
 
 
-        print(t)
-        if t > tval:
-            significant.append(pixel)
+        #print(t)
+        if abs(t) > tval:
+            significant[pixel] = True
 
 
-
+    print(maxt)
+    print(mint)
 
 
 
@@ -572,11 +583,26 @@ def monthly_computation_handler(month, lat, lon):
 
     #### Plot Regression coefficient map
 
-    rcoeffs, significant = get_regression_coeffs(snow_comb, x_time, X.shape[0]) # need to track indicies when rows are inserted
-    print(significant)
+    # rcoeffs is the regression coefficients (slope) of each pixel in the abbreviated dataset, sig is a boolean mask for pixels that are statistically significant
+    rcoeffs, sig = get_regression_coeffs(snow_comb, x_time, X.shape[0]) # need to track indicies when rows are inserted
+    #print(significant)
 
     # reinserting and plotting
-    rcoeffs_map = reinsert_rows(rcoeffs, suffix=str(month)).reshape(data_dim[0], data_dim[1])
+    rcoeffs_map, idxs = reinsert_rows(rcoeffs, suffix=str(month))
+    rcoeffs_map = rcoeffs_map.reshape(data_dim[0], data_dim[1])
+
+    # creating a 720x720 map out of the "sig" boolean mask
+    sig_map = np.full(data_dim[0]*data_dim[1], False, dtype=bool)
+    sig_map[idxs] = sig
+    sig_map = sig_map.reshape(data_dim[0], data_dim[1])
+
+    # just testing for now
+    plotter({"sig map" : sig_map}, coord=(lat, lon), dx=25000, dy=25000,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
+            month=month, cbar_label="significant?", save_as=None)
+
+
+
     # turn into dict and plot
     plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
@@ -645,7 +671,6 @@ def monthly_computation_handler(month, lat, lon):
     # rows contain eigenvectors of X^T X
     for y in range(plt_rng):
         nvec = reinsert_rows(eof[:,y], suffix=str(month))
-
         # reshape
         nvec = nvec.reshape(data_dim[0], data_dim[1])
 
