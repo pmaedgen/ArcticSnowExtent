@@ -20,7 +20,7 @@ mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'nondetrended_covar' # options are detrended/nondetrended_covar/svd
 
 save = False
-display = True # display the plots on the screen
+display = False # display the plots on the screen
 
 ## DO NOT CHANGE UNLESS YOU KNOW WHAT YOURE DOING
 data_path = "./Data/data/"
@@ -29,7 +29,7 @@ logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 fig_ext = "jpg"
 
-m_rng = range(10, 13) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
+m_rng = range(1, 13) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
 
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
@@ -453,6 +453,7 @@ def get_regression_coeffs(data, domain, N, two_tailed=True):
 
     # finding regression coefficients
     rcoeffs = np.zeros(N)
+    tstats = np.zeros(N)
     significant = np.full(N, False, dtype=bool) # contains indicies of statistically significant pixels
     for pixel in range(N):
         lreg = LinearRegression().fit(domain, data[pixel,:])
@@ -478,9 +479,10 @@ def get_regression_coeffs(data, domain, N, two_tailed=True):
         ypred = lreg.predict(domain)
         resid = data[pixel,:] - ypred
         sterr = np.square(resid).sum() / ( dof * np.square(data[pixel,:] - data[pixel,:].mean()).sum() )
-        #t = rcoeffs[pixel] / np.sqrt(sterr)
-        t = rcoeffs[pixel] / sterr
+        t = rcoeffs[pixel] / np.sqrt(sterr)
+        #t = rcoeffs[pixel] / sterr
         #print(sterr)
+        tstats[pixel] = t
 
         if t > maxt:
             maxt = t
@@ -496,10 +498,11 @@ def get_regression_coeffs(data, domain, N, two_tailed=True):
 
     print(maxt)
     print(mint)
+    print(rcoeffs.mean())
 
 
 
-    return rcoeffs, significant
+    return rcoeffs, significant, tstats
 
 
 
@@ -584,8 +587,14 @@ def monthly_computation_handler(month, lat, lon):
     #### Plot Regression coefficient map
 
     # rcoeffs is the regression coefficients (slope) of each pixel in the abbreviated dataset, sig is a boolean mask for pixels that are statistically significant
-    rcoeffs, sig = get_regression_coeffs(snow_comb, x_time, X.shape[0]) # need to track indicies when rows are inserted
-    #print(significant)
+    rcoeffs, sig, tstats = get_regression_coeffs(snow_comb, x_time, X.shape[0]) # need to track indicies when rows are inserted
+
+
+    ## TESTING creating dataframe to send this to excel
+    df = pd.DataFrame(snow_comb, columns=[str(i) for i in range(snow_comb.shape[1])])
+    df['rcoeff'] = rcoeffs
+    df['t-stat'] = tstats
+    df.to_excel(logs_path+m_names[month]+"_data_ttest.xlsx")
 
     # reinserting and plotting
     rcoeffs_map, idxs = reinsert_rows(rcoeffs, suffix=str(month))
@@ -670,7 +679,7 @@ def monthly_computation_handler(month, lat, lon):
     ## PLOT LOADING MAPS
     # rows contain eigenvectors of X^T X
     for y in range(plt_rng):
-        nvec = reinsert_rows(eof[:,y], suffix=str(month))
+        nvec = reinsert_rows(eof[:,y], suffix=str(month))[0]
         # reshape
         nvec = nvec.reshape(data_dim[0], data_dim[1])
 
