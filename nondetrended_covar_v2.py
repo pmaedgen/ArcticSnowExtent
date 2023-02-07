@@ -478,7 +478,8 @@ def get_regression_coeffs(data, domain, N, two_tailed=True):
 
         ypred = lreg.predict(domain)
         resid = data[pixel,:] - ypred
-        sterr = np.square(resid).sum() / ( dof * np.square(data[pixel,:] - data[pixel,:].mean()).sum() )
+        #sterr = np.square(resid).sum() / ( dof * np.square(data[pixel,:] - data[pixel,:].mean()).sum() )
+        sterr = np.square(resid).sum() / ( dof * np.square(domain - domain.mean()).sum() )
         t = rcoeffs[pixel] / np.sqrt(sterr)
         #t = rcoeffs[pixel] / sterr
         #print(sterr)
@@ -492,6 +493,7 @@ def get_regression_coeffs(data, domain, N, two_tailed=True):
 
 
         #print(t)
+        ## change for one-tailed option (specify positive/negative)
         if abs(t) > tval:
             significant[pixel] = True
 
@@ -591,15 +593,20 @@ def monthly_computation_handler(month, lat, lon):
 
 
     ## TESTING creating dataframe to send this to excel
-    df = pd.DataFrame(snow_comb, columns=[str(i) for i in range(snow_comb.shape[1])])
-    df['rcoeff'] = rcoeffs
-    df['t-stat'] = tstats
-    df.to_excel(logs_path+m_names[month]+"_data_ttest.xlsx")
+    # df = pd.DataFrame(snow_comb, columns=[str(i) for i in range(snow_comb.shape[1])])
+    # df['rcoeff'] = rcoeffs
+    # df['t-stat'] = tstats
+    # df.to_excel(tabl_path+"t_test/"+m_names[month]+"_data_ttest_scale_V2.xlsx")
 
     # reinserting and plotting
     rcoeffs_map, idxs = reinsert_rows(rcoeffs, suffix=str(month))
     rcoeffs_map = rcoeffs_map.reshape(data_dim[0], data_dim[1])
 
+
+
+
+
+    ##### Plotting significant pixels
     # creating a 720x720 map out of the "sig" boolean mask
     sig_map = np.full(data_dim[0]*data_dim[1], False, dtype=bool)
     sig_map[idxs] = sig
@@ -609,6 +616,8 @@ def monthly_computation_handler(month, lat, lon):
     plotter({"sig map" : sig_map}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
             month=month, cbar_label="significant?", save_as=None)
+
+
 
 
 
