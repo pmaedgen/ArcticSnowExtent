@@ -42,7 +42,8 @@ end_year = 2020
 # min. latitude (degrees NORTH), max. latitude))
 hmaps = [(1, (80, 90, 40, 45)),
         (4, (65, 80, 50, 55)),
-        (10, (90, 120, 60, 67))] # note for later - may try to define a coordinate Class
+        (10, (90, 120, 60, 67))]
+
 # remove months that aren't in m_rng (there are better ways to do this once I get around to refactoring)
 hmaps = [tup for tup in hmaps if tup[0] in m_rng]
 hmaps.sort(key=lambda tup: tup[0]) # sorted ascending by months
@@ -92,7 +93,7 @@ def masking(dmatrix, dtype='snow'):
     '''
         Given a data matrix
 
-        Masks vals >5, 4, 0
+        Masks vals to only contain snow or sea ice
 
         Returns maksed matrix
     '''
@@ -144,12 +145,9 @@ def monthly_load_data(month, path=data_path, dtype='snow', quiet=False):
                 if not quiet:
                     print("Loading "+fname)
 
-#                 hdr = f.read(300)  # Reading 300 byte header
                 ice = np.fromfile(f, dtype=np.uint8)  # Unsigned 8 bit Integer (0-2^7)
 
-                ## Processing
-                # make the matrix of 448/304
-                # scale by 250, masking out land values
+                ## Reshape to be 720x720 matrix
                 ice = ice.reshape(data_dim[0], data_dim[1])
 
 
@@ -171,6 +169,8 @@ def basic_info(dlist):
             - The number of files,
             - Dimensions of each file
             - Total number of elements in each file
+
+        Useful for testing but not necessary
     '''
 
     leng = len(dlist.values())
@@ -183,7 +183,6 @@ def basic_info(dlist):
 
 
 def load_latlon(cpath="./Data/lat_lon/", dim=data_dim):
-    # loading data into dict
     coords = []
     for fname in os.listdir(cpath):
             if fname.endswith(".double"):
@@ -207,10 +206,7 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, cmap=plt.c
     '''
         Plot given list of data matricies
 
-        TODO: rewrite to be more versatile, plot only single instance
-        or different time periods
-
-        Figure out how to standardize colors/colorbar
+        Note: can be refactored to remove useless arguments
     '''
     # plt.rcParams["font.family"] = "Times New Roman"
 
@@ -289,30 +285,32 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, cmap=plt.c
         fig.clear()
         plt.close(fig)
 
-        print(ice[0]) # Print filename
+        print(ice[0]) # Print map name
 
 
 
 ###### OTHER FUNCTIONS
 
 
-def change_by_index(ice, indicies, sub=-999.0):
-    '''
-        indicies is list of tuples containing coordinates to swap
-    '''
-    new_dict = ice
-    for m in new_dict.values():
-        transplant = np.array([sub]*len(indicies))
-        r, c = zip(*indicies)
-        m[r, c] = transplant
-    return new_dict
+# def change_by_index(ice, indicies, sub=-999.0):
+#     '''
+#         indicies is list of tuples containing coordinates to swap
+#     '''
+#     new_dict = ice
+#     for m in new_dict.values():
+#         transplant = np.array([sub]*len(indicies))
+#         r, c = zip(*indicies)
+#         m[r, c] = transplant
+#     return new_dict
 
-def get_head(d):
-    '''
-        Getting top key value pair from a dict
-    '''
-    ## This is probably an awful way of doing this but it works
-    return dict([list(d.items())[0]])
+# def get_head(d):
+#     '''
+#         Getting top key value pair from a dict
+#
+#         Useful for testing
+#     '''
+#     ## This is probably an awful way of doing this but it works
+#     return dict([list(d.items())[0]])
 
 
 def sum_years(d, start_y=start_year, end_y=end_year, dim=data_dim):
@@ -349,7 +347,6 @@ def remove_rows(m, suffix='', dtype='snow'):
         drop rows from combined matrix where var =0
         return m
 
-        Todo: optionally delete file, add another file name to use ice
     '''
 
     # check if std file already exists
@@ -381,7 +378,7 @@ def reinsert_rows(vec, suffix='', dtype="snow", dim=data_dim):
         Read the list of indicies then insert zeros,
         then return vector
 
-        optionally return the indicies that were changed as well
+        returns the indicies that were changed as well
     '''
 
     # list on indicies not removed from original vector
@@ -433,7 +430,7 @@ def get_regression_coeffs(data, domain, N, trend="two-tailed"):
 
     # finding regression coefficients
     rcoeffs = np.zeros(N)
-    significant = np.full(N, False, dtype=bool) # contains indicies of statistically significant pixels
+    significant = np.full(N, False, dtype=bool) # boolean mask of statistically significant pixels
     for pixel in range(N):
         lreg = LinearRegression().fit(domain, data[pixel,:])
         # slopes
@@ -473,19 +470,6 @@ def get_regression_coeffs(data, domain, N, trend="two-tailed"):
 
 #################################################
 
-def seasonal_data_handler(season):
-    # load all files for each month and concatenate them together
-    #
-    pass
-
-def monthly_data_handler(month):
-    '''
-        Fairly simple, just a call to the monthly load data function
-
-        Probably don't need a seperate function just for this but it will help with abstraction later on
-    '''
-    data = monthly_load_data(month=month, dtype='snow', quiet=True)
-    return data
 
 def seasonal_computation_handler(season, lat, lon):
     pass
@@ -497,7 +481,7 @@ def monthly_computation_handler(month, lat, lon):
 
     print("Loading/prepping data...")
     ### LOADING/PREPPING DATA
-    snow_d = monthly_data_handler(month)
+    snow_d = monthly_load_data(month=month, dtype='snow', quiet=True)
 
     year_snow_d = sum_years(snow_d)
     snow_combined = combine_years(year_snow_d)
@@ -537,7 +521,7 @@ def monthly_computation_handler(month, lat, lon):
     #### Plot Regression coefficient map
 
     # rcoeffs is the regression coefficients (slope) of each pixel in the abbreviated dataset, sig is a boolean mask for pixels that are statistically significant
-    rcoeffs, sig = get_regression_coeffs(snow_comb, x_time, X.shape[0]) # need to track indicies when rows are inserted
+    rcoeffs, sig = get_regression_coeffs(snow_comb, x_time, X.shape[0])
 
 
     # reinserting and plotting
@@ -631,7 +615,7 @@ def monthly_computation_handler(month, lat, lon):
     # rows contain eigenvectors of X^T X
     for y in range(plt_rng):
         nvec = reinsert_rows(eof[:,y], suffix=str(month))[0]
-        # reshape
+        # reshape into 720x720 matrix
         nvec = nvec.reshape(data_dim[0], data_dim[1])
 
         # turn into dict and plot
@@ -643,7 +627,7 @@ def monthly_computation_handler(month, lat, lon):
 
 
 def main():
-    evr = pd.DataFrame() # explained var
+    evr = pd.DataFrame() # explained variance ratio
     timeseries = {}
 
     # loading lat/lon
