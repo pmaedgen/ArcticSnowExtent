@@ -19,9 +19,8 @@ plt.rcParams.update({'font.size': 22})
 mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'detrended_covar' # options are detrended/nondetrended_covar/svd
 
-save = True
-display = False # display the plots on the screen
-
+save = False
+display = True # display the plots on the screen
 
 ## DO NOT CHANGE UNLESS YOU KNOW WHAT YOURE DOING
 data_path = "./Data/data/"
@@ -30,24 +29,24 @@ logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 fig_ext = "jpg"
 
-m_rng = range(1, 13) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
+m_rng = range(10, 11) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
+
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
 data_dim = (720, 720) # shape of all of the data files
 start_year = 1979
 end_year = 2020
 
-# Included here but not necessary for detrended covar since the regression map will be blank
 # Heatmap boundaries
 # sorted list of tuples of tuples(month, (min. longitude (degrees EAST), max. longitude,
 # min. latitude (degrees NORTH), max. latitude))
 hmaps = [(1, (80, 90, 40, 45)),
         (4, (65, 80, 50, 55)),
-        (10, (90, 120, 60, 67))] # note for later - may try to define a coordinate Class
+        (10, (90, 120, 60, 67))]
+
 # remove months that aren't in m_rng (there are better ways to do this once I get around to refactoring)
 hmaps = [tup for tup in hmaps if tup[0] in m_rng]
 hmaps.sort(key=lambda tup: tup[0]) # sorted ascending by months
-
 
 # Dictionary of how months are organized into seasons
 seasons = {'winter' : [12, 1, 2],
@@ -60,44 +59,30 @@ m_names = {1 : 'Jan', 2 : 'Feb', 3 : 'Mar', 4 : 'Apr',
            5 : 'May', 6 : 'Jun', 7 : 'Jul', 8 : 'Aug',
            9 : 'Sep', 10 : 'Oct', 11 : 'Nov', 12 : 'Dec'}
 
+
 '''
-    Generalizing to seasonal analysis is still a work in progress
-    But monthly analysis works
-
-    Only looking at snow for now not sea ice
-
     -> TODO:
 
-        - Fourier analysis and extracting continents
-        - Countour plots and mapping significance (fix these)
+        - Contours over maps
 
-        - for seasonal mode:
-            - if december load data from previous year
-            - for simplicity, just make a seperate load function. Then I can combine later if necessary
-            - will need to adjust the sum years function as well
-            - finish seasonal computation
+        - Add seasonal mode (not a priority)
+            - or delete functions used for seasonal mode
 
-        - some of the lmap plots still look slightly off as latitude decreases
-            - check cartopy transform
+        - check cartopy transform
+
         - Standardize colorbar/adjust gradient
+
         - change logs path. Doesn't need to be split up by method, only mode
 
-        - simplify/generalize saving tables
-            - save after every calculation instead of once at the end
         - for dfs, update append to concat
 
         - update SVD (not a priority)
 
         - Clean up and abstract code
-            - lots of refactoring, get rid of unneccessary functions and imports
-            - safety checks (try, catch, except, etc.)
-            - put different methods in their own functions
-            - make generalized plotting function (or plotting class)
-            - create master code for all methods
-            - change some variable names (Im looking at you, dtype)
-            - optional command line arguments for global variables
-            - Lots more comments and documentation (and a README)
-            - requirements.txt + instructions and resources for cartopy/proj
+
+        - add/test sea ice mode (not a priority)
+
+        - add command line arguments (not a priority)
 
 '''
 
@@ -108,7 +93,7 @@ def masking(dmatrix, dtype='snow'):
     '''
         Given a data matrix
 
-        Masks vals >5, 4, 0
+        Masks vals to only contain snow or sea ice
 
         Returns maksed matrix
     '''
@@ -160,12 +145,9 @@ def monthly_load_data(month, path=data_path, dtype='snow', quiet=False):
                 if not quiet:
                     print("Loading "+fname)
 
-#                 hdr = f.read(300)  # Reading 300 byte header
                 ice = np.fromfile(f, dtype=np.uint8)  # Unsigned 8 bit Integer (0-2^7)
 
-                ## Processing
-                # make the matrix of 448/304
-                # scale by 250, masking out land values
+                ## Reshape to be 720x720 matrix
                 ice = ice.reshape(data_dim[0], data_dim[1])
 
 
@@ -187,6 +169,8 @@ def basic_info(dlist):
             - The number of files,
             - Dimensions of each file
             - Total number of elements in each file
+
+        Useful for testing but not necessary
     '''
 
     leng = len(dlist.values())
@@ -199,7 +183,6 @@ def basic_info(dlist):
 
 
 def load_latlon(cpath="./Data/lat_lon/", dim=data_dim):
-    # loading data into dict
     coords = []
     for fname in os.listdir(cpath):
             if fname.endswith(".double"):
@@ -210,27 +193,20 @@ def load_latlon(cpath="./Data/lat_lon/", dim=data_dim):
 
                     coords.append(file)
 
-    # lon is in [0], lat is in [1]
+    # lon is in coords[0], lat is in coords[1]
     return coords[1], coords[0]
 
 
 
 #### PLOTTING
 
-## delete this
-def f(x, y):
-    return np.sin(x) ** 10 + np.cos(10 + y * x) * np.cos(x)
-
-def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=False,
-            cmap=plt.cm.Blues, cb_tix=True, cb_marg=1, cb_range=None,
+def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, cmap=plt.cm.Blues,
+            cb_tix=True, cb_marg=1, cb_range=None, sig_map=None,
             bbox=None, month=None, cbar_label=None, save_as=None):
     '''
         Plot given list of data matricies
 
-        TODO: rewrite to be more versatile, plot only single instance
-        or different time periods
-
-        Figure out how to standardize colors/colorbar
+        Note: can be refactored to remove useless arguments
     '''
     # plt.rcParams["font.family"] = "Times New Roman"
 
@@ -274,17 +250,18 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=Fa
             else:
                 divnorm=colors.TwoSlopeNorm(vmax=ice[1].max()+cb_marg, vcenter=0., vmin=ice[1].min()-cb_marg)
 
-            if contour:
-                cs = ax.contourf(x, y, ice[1],
-                    transform=ccrs.Stereographic(**kw), cmap=cmap, norm=divnorm)
-                ax.contour(x, y, ice[1], levels=cs.levels,
-                           transform=ccrs.Stereographic(**kw), colors='black')
 
-            else:
-                cs = ax.pcolormesh(x, y, ice[1], cmap=cmap, norm=divnorm,
-                       transform=ccrs.Stereographic(**kw), zorder=1)
+            cs = ax.pcolormesh(x, y, ice[1], cmap=cmap, norm=divnorm,
+                    transform=ccrs.Stereographic(**kw), zorder=1)
 
             cb = fig.colorbar(cs, ax=ax)
+
+        if sig_map is not None:
+            plt.rcParams['hatch.linewidth'] = 0.5
+            plt.rcParams['hatch.color'] = 'white'
+            ax.contour(x, y, sig_map, colors="white", linewidths=0.5, transform=ccrs.Stereographic(**kw))
+            ax.contourf(x, y, sig_map.astype(int), transform=ccrs.Stereographic(**kw),
+                colors="none", levels=[-0.5, 0.5, 1], hatches=[None, '///'])
 
         if bbox:
             ax.plot([bbox[0], bbox[1], bbox[1], bbox[0], bbox[0]],
@@ -292,15 +269,13 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=Fa
                     c='black', zorder=10,
                     transform=ccrs.PlateCarree())
 
+
         if month:
             ax.set_title(m_names.get(month), fontsize=28, pad=15)
         if cbar_label:
             cb.set_label(cbar_label, rotation=270, labelpad=30, fontsize=24)
 
-        if save_as:
-            if contour: # adjusting filename if contour is true
-                save_as = save_as[:-4] + "_contour." + fig_ext
-
+        if save_as and save:
             plt.savefig(save_as, format=fig_ext, dpi=300, bbox_inches = 'tight')
 
         if display:
@@ -310,30 +285,32 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=Fa
         fig.clear()
         plt.close(fig)
 
-        print(ice[0]) # Print filename
+        print(ice[0]) # Print map name
 
 
 
 ###### OTHER FUNCTIONS
 
 
-def change_by_index(ice, indicies, sub=-999.0):
-    '''
-        indicies is list of tuples containing coordinates to swap
-    '''
-    new_dict = ice
-    for m in new_dict.values():
-        transplant = np.array([sub]*len(indicies))
-        r, c = zip(*indicies)
-        m[r, c] = transplant
-    return new_dict
+# def change_by_index(ice, indicies, sub=-999.0):
+#     '''
+#         indicies is list of tuples containing coordinates to swap
+#     '''
+#     new_dict = ice
+#     for m in new_dict.values():
+#         transplant = np.array([sub]*len(indicies))
+#         r, c = zip(*indicies)
+#         m[r, c] = transplant
+#     return new_dict
 
-def get_head(d):
-    '''
-        Getting top key value pair from a dict
-    '''
-    ## This is probably an awful way of doing this but it works
-    return dict([list(d.items())[0]])
+# def get_head(d):
+#     '''
+#         Getting top key value pair from a dict
+#
+#         Useful for testing
+#     '''
+#     ## This is probably an awful way of doing this but it works
+#     return dict([list(d.items())[0]])
 
 
 def sum_years(d, start_y=start_year, end_y=end_year, dim=data_dim):
@@ -370,7 +347,6 @@ def remove_rows(m, suffix='', dtype='snow'):
         drop rows from combined matrix where var =0
         return m
 
-        Todo: optionally delete file, add another file name to use ice
     '''
 
     # check if std file already exists
@@ -394,7 +370,7 @@ def cut_rows(m, fname):
     indicies = [int(line.strip()) for line in open(fname, 'r')]
 
     # get np matrix of indicies
-    return m[np.ix_(indicies)], indicies # np.ix_ should be working correctly here but it may not be necessary as the indicies are 1 dimensional
+    return m[np.ix_(indicies)]
 
 
 def reinsert_rows(vec, suffix='', dtype="snow", dim=data_dim):
@@ -402,7 +378,7 @@ def reinsert_rows(vec, suffix='', dtype="snow", dim=data_dim):
         Read the list of indicies then insert zeros,
         then return vector
 
-        fix this: may need to reinsert rows from vec 1 by 1
+        returns the indicies that were changed as well
     '''
 
     # list on indicies not removed from original vector
@@ -415,7 +391,7 @@ def reinsert_rows(vec, suffix='', dtype="snow", dim=data_dim):
     # replacing with values from vec
     z[lines] = vec
 
-    return z
+    return z, lines
 
 def write_evr(evr, save_as):
     with pd.ExcelWriter(tabl_path+save_as) as writer:
@@ -425,7 +401,6 @@ def write_timeseries(ts, save_as):
     with pd.ExcelWriter(tabl_path+save_as) as writer:
         for m, t, in ts.items():
             t.to_excel(writer, sheet_name = str(m), index=False)
-
 
 def get_box_data(data, lat, lon, box):
     '''
@@ -443,62 +418,58 @@ def get_box_data(data, lat, lon, box):
     return data[np.intersect1d(lon_idx, lat_idx, assume_unique=True), :]
 
 
-def get_regression_coeffs(data, domain, N, two_tailed=True):
+def get_regression_coeffs(data, domain, N, trend="two-tailed"):
+    '''
+        Calculating regression coefficients and t-test
+
+        for 'trend' variable - Options are "positive", "negative", or "two-tailed"
+    '''
 
     # threshold based on 95% confidence interval and 40 degrees of freedom
     dof = data.shape[1] - 2 # 40
-    tval = 2.021
-    if not two_tailed:
-        tval = 1.684
 
     # finding regression coefficients
     rcoeffs = np.zeros(N)
-    significant = [] # contains indicies of statistically significant pixels
+    significant = np.full(N, False, dtype=bool) # boolean mask of statistically significant pixels
     for pixel in range(N):
         lreg = LinearRegression().fit(domain, data[pixel,:])
         # slopes
         rcoeffs[pixel] = lreg.coef_
 
-        ### t-test
-        # residuals
+        # calculating t-statistic
         ypred = lreg.predict(domain)
         resid = data[pixel,:] - ypred
+        var_resid = np.square(resid).sum() / ( dof * np.square(domain - domain.mean()).sum() ) # variance of the residuals AKA the square of the standard error
+        t = rcoeffs[pixel] / np.sqrt(var_resid)
 
-        # variance of residuals
-        resid_var = np.square(resid).sum() / dof
-
-        # standard error of rcoeff
-        s_a = resid_var / np.square( data[pixel,:] - data[pixel,:].mean() ).sum()
-
-        # t
-        t = rcoeffs[pixel] / np.sqrt(s_a)
-        print(t)
-        if t > tval:
-            significant.append(pixel)
-
-
-
+        if trend == "two-tailed":
+            if abs(t) > 2.021:
+                significant[pixel] = True
+        elif trend == "positive":
+            if t > 1.684:
+                significant[pixel] = True
+        elif trend == "negative":
+            if t < -1.684:
+                significant[pixel] = True
+        else:
+            print("Passed 'trend' option not recognized. Defaulting to two-tailed mode. T-value set to 2.021.")
+            if abs(t) > 2.021:
+                significant[pixel] = True
 
 
 
     return rcoeffs, significant
 
 
+
+
+
+
+
+
+
 #################################################
 
-def seasonal_data_handler(season):
-    # load all files for each month and concatenate them together
-    #
-    pass
-
-def monthly_data_handler(month):
-    '''
-        Fairly simple, just a call to the monthly load data function
-
-        Probably don't need a seperate function just for this but it will help with abstraction later on
-    '''
-    data = monthly_load_data(month=month, dtype='snow', quiet=True)
-    return data
 
 def seasonal_computation_handler(season, lat, lon):
     pass
@@ -510,17 +481,16 @@ def monthly_computation_handler(month, lat, lon):
 
     print("Loading/prepping data...")
     ### LOADING/PREPPING DATA
-    snow_d = monthly_data_handler(month)
+    snow_d = monthly_load_data(month=month, dtype='snow', quiet=True)
 
     year_snow_d = sum_years(snow_d)
     snow_combined = combine_years(year_snow_d)
 
-    # sets max value as 4 instead of 5 then divide by 4
-    # given the format of this matrix, you would want to apply it to all the columns,
-    # but given that the function only works on individual elements for a single month, applying it across all elements row-wise will also work
+    # sets max value as 4 instead of 5
     snow_combined = np.vectorize(lambda x: min(x, 4)/4)(snow_combined)
 
-    snow_comb, indicies = remove_rows(snow_combined, suffix=str(month))
+    # getting the abbreviated dataset as well as their indicies in the orgiginal dataset (not needed here)
+    snow_comb = remove_rows(snow_combined, suffix=str(month))
     x_time = np.arange(0, snow_comb.shape[1], 1).reshape(-1, 1)
 
     ### SETTING DATA MATRIX, X
@@ -554,28 +524,42 @@ def monthly_computation_handler(month, lat, lon):
     time_save_as = figs_path + str(month) + "/snow_time/pc_timeseries"
     lmap_save_as = figs_path + str(month) + "/snow_lmap/map_loading"
     rmap_save_as = figs_path + str(month) + "/snow_rmap/map_reg_coeff"
+    sigp_save_as = figs_path + str(month) + "/snow_rmap/map_rcoeff_significant"
 
-    #### REGRESSION MAP WILL BE BLANK FOR DETRENDED
     #### Plot Regression coefficient map
 
-    rcoeffs, significant = get_regression_coeffs(snow_dt, x_time, X.shape[0]) # need to track indicies when rows are inserted
-    print(significant)
+    # rcoeffs is the regression coefficients (slope) of each pixel in the abbreviated dataset, sig is a boolean mask for pixels that are statistically significant
+    rcoeffs, sig = get_regression_coeffs(snow_dt, x_time, X.shape[0])
+
 
     # reinserting and plotting
-    rcoeffs_map = reinsert_rows(rcoeffs, suffix=str(month)).reshape(data_dim[0], data_dim[1])
+    rcoeffs_map, idxs = reinsert_rows(rcoeffs, suffix=str(month))
+    rcoeffs_map = rcoeffs_map.reshape(data_dim[0], data_dim[1])
+
+
+    # creating a 720x720 map out of the "sig" boolean mask
+    sig_map = np.full(data_dim[0]*data_dim[1], False, dtype=bool)
+    sig_map[idxs] = sig
+    sig_map = sig_map.reshape(data_dim[0], data_dim[1])
+
 
     # turn into dict and plot
     plotter({"Regression coefficient map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
             month=month, cbar_label="No. weeks / year", save_as=rmap_save_as+"."+fig_ext)
 
-    # Pointless for detrended, but still included here for posterity
+    # Regression map with contours
+    plotter({"Significant pixels map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
+            sig_map=sig_map, month=month, cbar_label="No. weeks / year", save_as=sigp_save_as+"."+fig_ext)
+
     # Plot heatmaps over specified boundary for a given month
-    while(len(hmaps)>0 and month==hmaps[0][0]): # check if current month has boundary box
+    while(len(hmaps)>0 and month==hmaps[0][0]): # checks if current month has boundary box to plot
         bbox = hmaps.pop(0)[1] # tuple of coordinates
 
         # file names
         rmap_box_save_as = figs_path + str(month) + "/snow_rmap/map_rcoeff_bbox_" + str(bbox[0]) + "_" + str(bbox[1]) + "_"+ str(bbox[2]) + "_" + str(bbox[3])
+        sigp_box_save_as = figs_path + str(month) + "/snow_rmap/map_rcoeff_significant_bbox_" + str(bbox[0]) + "_" + str(bbox[1]) + "_"+ str(bbox[2]) + "_" + str(bbox[3])
         hmap_save_as = figs_path + str(month) + "/snow_rmap/hmap_" + str(bbox[0]) + "_" + str(bbox[1]) + "_"+ str(bbox[2]) + "_" + str(bbox[3])
 
 
@@ -584,15 +568,21 @@ def monthly_computation_handler(month, lat, lon):
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005, bbox=bbox,
             month=month, cbar_label="No. weeks / year", save_as=rmap_box_save_as+"."+fig_ext)
 
+        # regression coefficient map with bounding box and contours over significant pixels
+        plotter({"Regression coefficient map with bbox and contours" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005, bbox=bbox,
+            sig_map=sig_map, month=month, cbar_label="No. weeks / year", save_as=sigp_box_save_as+"."+fig_ext)
+
         # get specified pixes based on coordinates
         hmap_data = get_box_data(snow_combined, lat.flatten(), lon.flatten(), bbox)
 
         # plot/save "heatmap"
         fig = plt.figure(figsize=(8, 8))
-        plt.imshow(hmap_data, interpolation='nearest', cmap=plt.cm.get_cmap('coolwarm_r'), aspect='auto')
+        im = plt.imshow(hmap_data, interpolation='nearest', cmap=plt.cm.get_cmap('coolwarm_r'), aspect='auto')
         plt.xticks(xlocs[1::2], xlbls[1::2])
         plt.xlabel("years", fontsize=22)
         plt.ylabel("pixels", fontsize=22)
+        fig.colorbar(im, ticks=[0, 0.25, 0.5, 0.75, 1])
 
         if save:
             plt.savefig(hmap_save_as+"."+fig_ext, format=fig_ext, dpi=300, bbox_inches="tight")
@@ -628,26 +618,25 @@ def monthly_computation_handler(month, lat, lon):
         fig.clear()
         plt.close(fig)
 
-        #plt.show()
 
 
     ## PLOT LOADING MAPS
     # rows contain eigenvectors of X^T X
     for y in range(plt_rng):
-        nvec = reinsert_rows(eof[:,y], suffix=str(month))
-
-        # reshape
+        nvec = reinsert_rows(eof[:,y], suffix=str(month))[0]
+        # reshape into 720x720 matrix
         nvec = nvec.reshape(data_dim[0], data_dim[1])
 
         # turn into dict and plot
         plotter({"Loadingvector "+str(y):nvec}, coord=(lat, lon), dx=25000, dy=25000,
-            marg=0, min_lat=30, contour=False, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
             month=month, save_as=lmap_save_as+str(y+1)+"."+fig_ext)
 
     return tseries, evr
 
+
 def main():
-    evr = pd.DataFrame() # explained var
+    evr = pd.DataFrame() # explained variance ratio
     timeseries = {}
 
     # loading lat/lon
@@ -660,7 +649,6 @@ def main():
             ts, ev = monthly_computation_handler(m, lat, lon)
             evr[str(m)] = ev
             timeseries[m] = ts
-
         if save:
             print("\nWriting results to spreadsheet.")
             write_evr(evr, save_as="explained_var_ratio.xlsx")
