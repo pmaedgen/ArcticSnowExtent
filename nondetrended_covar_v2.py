@@ -20,7 +20,7 @@ mode = 'monthly' # options are "monthly" or "seasonal"
 method = 'nondetrended_covar' # options are detrended/nondetrended_covar/svd
 
 save = False
-display = False # display the plots on the screen
+display = True # display the plots on the screen
 
 ## DO NOT CHANGE UNLESS YOU KNOW WHAT YOURE DOING
 data_path = "./Data/data/"
@@ -29,7 +29,7 @@ logs_path = "./logs/"+method+"/"+mode+"/"
 tabl_path = "./tables/"+mode+"_tables/"+method+"/"
 fig_ext = "jpg"
 
-m_rng = range(1, 13) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
+m_rng = range(10, 11) # range of months to plot. Always add one to final month so jan-dec is (1, 13), just march is (3, 4), etc.
 
 plt_rng = 3 # how many PCs to plot
 ## Keep in mind that figs arent deleted with each code execution, only overwritten. So if this number is reduced between executions, there will be some old figs left over
@@ -60,43 +60,26 @@ m_names = {1 : 'Jan', 2 : 'Feb', 3 : 'Mar', 4 : 'Apr',
 
 
 '''
-    Generalizing to seasonal analysis is still a work in progress
-    But monthly analysis works
-
-    Only looking at snow for now not sea ice
-
     -> TODO:
 
-        - Fourier analysis and extracting continents
-        - Countour plots and mapping significance (fix these)
+        - Contours over maps
 
-        - for seasonal mode:
-            - if december load data from previous year
-            - for simplicity, just make a seperate load function. Then I can combine later if necessary
-            - will need to adjust the sum years function as well
-            - finish seasonal computation
+        - Add seasonal mode (not a priority)
+            - or delete functions used for seasonal mode
 
-        - some of the lmap plots still look slightly off as latitude decreases
-            - check cartopy transform
+        - check cartopy transform
+
         - Standardize colorbar/adjust gradient
+
         - change logs path. Doesn't need to be split up by method, only mode
 
-        - simplify/generalize saving tables
-            - save after every calculation instead of once at the end
         - for dfs, update append to concat
 
         - update SVD (not a priority)
 
         - Clean up and abstract code
-            - lots of refactoring, get rid of unneccessary functions and imports
-            - safety checks (try, catch, except, etc.)
-            - put different methods in their own functions
-            - make generalized plotting function (or plotting class)
-            - create master code for all methods
-            - change some variable names (Im looking at you, dtype)
-            - optional command line arguments for global variables
-            - Lots more comments and documentation (and a README)
-            - requirements.txt + instructions and resources for cartopy/proj
+
+        - add/test sea ice mode (not a priority)
 
 '''
 
@@ -392,7 +375,7 @@ def cut_rows(m, fname):
     indicies = [int(line.strip()) for line in open(fname, 'r')]
 
     # get np matrix of indicies
-    return m[np.ix_(indicies)], indicies
+    return m[np.ix_(indicies)]
 
 
 def reinsert_rows(vec, suffix='', dtype="snow", dim=data_dim):
@@ -440,71 +423,47 @@ def get_box_data(data, lat, lon, box):
     return data[np.intersect1d(lon_idx, lat_idx, assume_unique=True), :]
 
 
-def get_regression_coeffs(data, domain, N, two_tailed=True):
+def get_regression_coeffs(data, domain, N, trend="two-tailed"):
+    '''
+        Calculating regression coefficients and t-test
 
-    maxt = 0
-    mint = 0
+        for 'trend' variable - Options are "positive", "negative", or "two-tailed"
+    '''
 
     # threshold based on 95% confidence interval and 40 degrees of freedom
     dof = data.shape[1] - 2 # 40
-    tval = 2.021
-    if not two_tailed:
-        tval = 1.684
 
     # finding regression coefficients
     rcoeffs = np.zeros(N)
-    tstats = np.zeros(N)
     significant = np.full(N, False, dtype=bool) # contains indicies of statistically significant pixels
     for pixel in range(N):
         lreg = LinearRegression().fit(domain, data[pixel,:])
         # slopes
         rcoeffs[pixel] = lreg.coef_
 
-        # ### t-test
-        # # residuals
-        # ypred = lreg.predict(domain)
-        # resid = data[pixel,:] - ypred
-        # # variance of residuals
-        # resid_var = np.square(resid).sum() / dof
-        # # standard error of rcoeff
-        # s_a = resid_var / np.square( data[pixel,:] - data[pixel,:].mean() ).sum()
-        # # t
-        # t = rcoeffs[pixel] / np.sqrt(s_a)
-
-
-        # ypred = lreg.predict(domain)
-        # resid = data[pixel,:] - ypred
-        # t = (rcoeffs[pixel] * np.sqrt(dof * np.square( data[pixel,:] - data[pixel,:].mean() ).sum())) / np.sqrt( np.square(resid).sum() )
-
+        # calculating t-statistic
         ypred = lreg.predict(domain)
         resid = data[pixel,:] - ypred
-        #sterr = np.square(resid).sum() / ( dof * np.square(data[pixel,:] - data[pixel,:].mean()).sum() )
-        sterr = np.square(resid).sum() / ( dof * np.square(domain - domain.mean()).sum() )
-        t = rcoeffs[pixel] / np.sqrt(sterr)
-        #t = rcoeffs[pixel] / sterr
-        #print(sterr)
-        tstats[pixel] = t
+        var_resid = np.square(resid).sum() / ( dof * np.square(domain - domain.mean()).sum() ) # variance of the residuals AKA the square of the standard error
+        t = rcoeffs[pixel] / np.sqrt(var_resid)
 
-        if t > maxt:
-            maxt = t
-        if t < mint:
-            mint = t
-
-
-
-        #print(t)
-        ## change for one-tailed option (specify positive/negative)
-        if abs(t) > tval:
-            significant[pixel] = True
-
-
-    print(maxt)
-    print(mint)
-    print(rcoeffs.mean())
+        if trend == "two-tailed":
+            if abs(t) > 2.021:
+                significant[pixel] = True
+        elif trend == "positive":
+            if t > 1.684:
+                significant[pixel] = True
+        elif trend == "negative":
+            if t < -1.684:
+                significant[pixel] = True
+        else:
+            print("Passed 'trend' option not recognized. Defaulting to two-tailed mode. T-value set to 2.021.")
+            if abs(t) > 2.021:
+                significant[pixel] = True
 
 
 
-    return rcoeffs, significant, tstats
+    return rcoeffs, significant
 
 
 
@@ -546,26 +505,16 @@ def monthly_computation_handler(month, lat, lon):
     snow_combined = combine_years(year_snow_d)
 
     # sets max value as 4 instead of 5
-    # given the format of this matrix, you would want to apply it to all the columns,
-    # but given that the function only works on individual elements for a single month, applying it across all elements row-wise will also work
     snow_combined = np.vectorize(lambda x: min(x, 4)/4)(snow_combined)
 
-    # getting the abbreviated dataset as well as their indicies in the orgiginal dataset
-    snow_comb, indicies = remove_rows(snow_combined, suffix=str(month))
+    # getting the abbreviated dataset as well as their indicies in the orgiginal dataset (not needed here)
+    snow_comb = remove_rows(snow_combined, suffix=str(month))
     x_time = np.arange(0, snow_comb.shape[1], 1).reshape(-1, 1)
 
     ### SETTING DATA MATRIX, X
 
     ## NO DETRENDING
-    # print(snow_comb[:10])
-    # print(snow_comb.shape)
-
     X = StandardScaler().fit_transform(snow_comb.T).T
-
-    # print(X.shape)
-    # print(snow_comb.shape)
-
-
 
     ########### PCA ############
     ## COVARIANCE CALCULATION
@@ -589,10 +538,10 @@ def monthly_computation_handler(month, lat, lon):
     #### Plot Regression coefficient map
 
     # rcoeffs is the regression coefficients (slope) of each pixel in the abbreviated dataset, sig is a boolean mask for pixels that are statistically significant
-    rcoeffs, sig, tstats = get_regression_coeffs(snow_comb, x_time, X.shape[0]) # need to track indicies when rows are inserted
+    rcoeffs, sig = get_regression_coeffs(snow_comb, x_time, X.shape[0]) # need to track indicies when rows are inserted
 
 
-    ## TESTING creating dataframe to send this to excel
+    ## TESTING  T-test by creating dataframe to send this to excel
     # df = pd.DataFrame(snow_comb, columns=[str(i) for i in range(snow_comb.shape[1])])
     # df['rcoeff'] = rcoeffs
     # df['t-stat'] = tstats
@@ -645,10 +594,11 @@ def monthly_computation_handler(month, lat, lon):
 
         # plot/save "heatmap"
         fig = plt.figure(figsize=(8, 8))
-        plt.imshow(hmap_data, interpolation='nearest', cmap=plt.cm.get_cmap('coolwarm_r'), aspect='auto')
+        im = plt.imshow(hmap_data, interpolation='nearest', cmap=plt.cm.get_cmap('coolwarm_r'), aspect='auto')
         plt.xticks(xlocs[1::2], xlbls[1::2])
         plt.xlabel("years", fontsize=22)
         plt.ylabel("pixels", fontsize=22)
+        fig.colorbar(im, ticks=[0, 0.25, 0.5, 0.75, 1])
 
         if save:
             plt.savefig(hmap_save_as+"."+fig_ext, format=fig_ext, dpi=300, bbox_inches="tight")
