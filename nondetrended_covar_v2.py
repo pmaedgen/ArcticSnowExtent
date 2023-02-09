@@ -81,6 +81,8 @@ m_names = {1 : 'Jan', 2 : 'Feb', 3 : 'Mar', 4 : 'Apr',
 
         - add/test sea ice mode (not a priority)
 
+        - add command line arguments (not a priority)
+
 '''
 
 
@@ -192,18 +194,15 @@ def load_latlon(cpath="./Data/lat_lon/", dim=data_dim):
 
                     coords.append(file)
 
-    # lon is in [0], lat is in [1]
+    # lon is in coords[0], lat is in coords[1]
     return coords[1], coords[0]
 
 
 
 #### PLOTTING
 
-def f(x, y):
-    return np.sin(x) ** 10 + np.cos(10 + y * x) * np.cos(x)
-
-def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=False,
-            cmap=plt.cm.Blues, cb_tix=True, cb_marg=1, cb_range=None,
+def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, cmap=plt.cm.Blues,
+            cb_tix=True, cb_marg=1, cb_range=None, sig_map=None,
             bbox=None, month=None, cbar_label=None, save_as=None):
     '''
         Plot given list of data matricies
@@ -255,17 +254,18 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=Fa
             else:
                 divnorm=colors.TwoSlopeNorm(vmax=ice[1].max()+cb_marg, vcenter=0., vmin=ice[1].min()-cb_marg)
 
-            if contour:
-                cs = ax.contourf(x, y, ice[1],
-                    transform=ccrs.Stereographic(**kw), cmap=cmap, norm=divnorm)
-                ax.contour(x, y, ice[1], levels=cs.levels,
-                           transform=ccrs.Stereographic(**kw), colors='black')
 
-            else:
-                cs = ax.pcolormesh(x, y, ice[1], cmap=cmap, norm=divnorm,
-                       transform=ccrs.Stereographic(**kw), zorder=1)
+            cs = ax.pcolormesh(x, y, ice[1], cmap=cmap, norm=divnorm,
+                    transform=ccrs.Stereographic(**kw), zorder=1)
 
             cb = fig.colorbar(cs, ax=ax)
+
+        if sig_map is not None:
+            plt.rcParams['hatch.linewidth'] = 0.5
+            plt.rcParams['hatch.color'] = 'white'
+            ax.contour(x, y, sig_map, colors="white", linewidths=0.5, transform=ccrs.Stereographic(**kw))
+            ax.contourf(x, y, sig_map.astype(int), transform=ccrs.Stereographic(**kw),
+                colors="none", levels=[-0.5, 0.5, 1], hatches=[None, '///'])
 
         if bbox:
             ax.plot([bbox[0], bbox[1], bbox[1], bbox[0], bbox[0]],
@@ -273,15 +273,13 @@ def plotter(ice_d, coord, dx=25000, dy=25000, marg=50000, min_lat=30, contour=Fa
                     c='black', zorder=10,
                     transform=ccrs.PlateCarree())
 
+
         if month:
             ax.set_title(m_names.get(month), fontsize=28, pad=15)
         if cbar_label:
             cb.set_label(cbar_label, rotation=270, labelpad=30, fontsize=24)
 
-        if save_as:
-            if contour: # adjusting filename if contour is true
-                save_as = save_as[:-4] + "_contour." + fig_ext
-
+        if save_as and save:
             plt.savefig(save_as, format=fig_ext, dpi=300, bbox_inches = 'tight')
 
         if display:
@@ -534,6 +532,7 @@ def monthly_computation_handler(month, lat, lon):
     time_save_as = figs_path + str(month) + "/snow_time/pc_timeseries"
     lmap_save_as = figs_path + str(month) + "/snow_lmap/map_loading"
     rmap_save_as = figs_path + str(month) + "/snow_rmap/map_reg_coeff"
+    sigp_save_as = figs_path + str(month) + "/snow_rmap/map_rcoeff_significant"
 
     #### Plot Regression coefficient map
 
@@ -541,33 +540,15 @@ def monthly_computation_handler(month, lat, lon):
     rcoeffs, sig = get_regression_coeffs(snow_comb, x_time, X.shape[0]) # need to track indicies when rows are inserted
 
 
-    ## TESTING  T-test by creating dataframe to send this to excel
-    # df = pd.DataFrame(snow_comb, columns=[str(i) for i in range(snow_comb.shape[1])])
-    # df['rcoeff'] = rcoeffs
-    # df['t-stat'] = tstats
-    # df.to_excel(tabl_path+"t_test/"+m_names[month]+"_data_ttest_scale_V2.xlsx")
-
     # reinserting and plotting
     rcoeffs_map, idxs = reinsert_rows(rcoeffs, suffix=str(month))
     rcoeffs_map = rcoeffs_map.reshape(data_dim[0], data_dim[1])
 
 
-
-
-
-    ##### Plotting significant pixels
     # creating a 720x720 map out of the "sig" boolean mask
     sig_map = np.full(data_dim[0]*data_dim[1], False, dtype=bool)
     sig_map[idxs] = sig
     sig_map = sig_map.reshape(data_dim[0], data_dim[1])
-
-    # just testing for now
-    plotter({"sig map" : sig_map}, coord=(lat, lon), dx=25000, dy=25000,
-            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
-            month=month, cbar_label="significant?", save_as=None)
-
-
-
 
 
     # turn into dict and plot
@@ -575,12 +556,18 @@ def monthly_computation_handler(month, lat, lon):
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
             month=month, cbar_label="No. weeks / year", save_as=rmap_save_as+"."+fig_ext)
 
+    # Regression map with contours
+    plotter({"Significant pixels map" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005,
+            sig_map=sig_map, month=month, cbar_label="No. weeks / year", save_as=sigp_save_as+"."+fig_ext)
+
     # Plot heatmaps over specified boundary for a given month
-    while(len(hmaps)>0 and month==hmaps[0][0]): # check if current month has boundary box
+    while(len(hmaps)>0 and month==hmaps[0][0]): # checks if current month has boundary box to plot
         bbox = hmaps.pop(0)[1] # tuple of coordinates
 
         # file names
         rmap_box_save_as = figs_path + str(month) + "/snow_rmap/map_rcoeff_bbox_" + str(bbox[0]) + "_" + str(bbox[1]) + "_"+ str(bbox[2]) + "_" + str(bbox[3])
+        sigp_box_save_as = figs_path + str(month) + "/snow_rmap/map_rcoeff_significant_bbox_" + str(bbox[0]) + "_" + str(bbox[1]) + "_"+ str(bbox[2]) + "_" + str(bbox[3])
         hmap_save_as = figs_path + str(month) + "/snow_rmap/hmap_" + str(bbox[0]) + "_" + str(bbox[1]) + "_"+ str(bbox[2]) + "_" + str(bbox[3])
 
 
@@ -588,6 +575,11 @@ def monthly_computation_handler(month, lat, lon):
         plotter({"Regression coefficient map with bbox" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
             marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005, bbox=bbox,
             month=month, cbar_label="No. weeks / year", save_as=rmap_box_save_as+"."+fig_ext)
+
+        # regression coefficient map with bounding box and contours over significant pixels
+        plotter({"Regression coefficient map with bbox and contours" : rcoeffs_map}, coord=(lat, lon), dx=25000, dy=25000,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False, cb_marg=0.005, bbox=bbox,
+            sig_map=sig_map, month=month, cbar_label="No. weeks / year", save_as=sigp_box_save_as+"."+fig_ext)
 
         # get specified pixes based on coordinates
         hmap_data = get_box_data(snow_combined, lat.flatten(), lon.flatten(), bbox)
@@ -644,7 +636,7 @@ def monthly_computation_handler(month, lat, lon):
 
         # turn into dict and plot
         plotter({"Loadingvector "+str(y):nvec}, coord=(lat, lon), dx=25000, dy=25000,
-            marg=0, min_lat=30, contour=False, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
+            marg=0, min_lat=30, cmap=plt.cm.get_cmap('coolwarm_r'), cb_tix=False,
             month=month, save_as=lmap_save_as+str(y+1)+"."+fig_ext)
 
     return tseries, evr
