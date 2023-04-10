@@ -507,6 +507,12 @@ def monthly_computation_handler(month, lat, lon):
     eof = snow_fpca.getEOFs()
     evr = snow_fpca.getExpVar()
 
+    ### To fix april plotting
+    if month == 4:
+        pc *= -1
+        eof *= -1
+    ###
+
 
     ######## PLOTTING #########
     print("Plotting...")
